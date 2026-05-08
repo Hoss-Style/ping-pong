@@ -2139,24 +2139,33 @@ function TVDisplay({ data, onExit }) {
   return (
     <div style={S.tvShell}>
       <style>{globalCSS}</style>
+
+      {/* Top brand bar */}
       <div style={S.tvBrandBar}>
         <div style={S.tvBrandLeft}>
-          <div style={S.tvStarRow}><Star size={20} /><Star size={20} /><Star size={20} /></div>
+          <div style={S.tvStarRow}><Star size={26} /><Star size={26} /><Star size={26} /></div>
           <div>
             <div style={S.tvBrandTitle}>ATLAS SUPREME</div>
             <div style={S.tvBrandSub}>INVITATIONAL · {EVENT_DATE}</div>
           </div>
         </div>
+        {countdown && !champion && (
+          <div style={S.tvTopCountdown}>
+            <span style={S.tvLiveDot} />
+            <span style={S.tvTopCountdownText}>{liveSlot ? countdown : countdown}</span>
+          </div>
+        )}
         <div style={S.tvClock}>
           {now.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', hour12: true })}
         </div>
-        <button style={S.tvExitBtn} onClick={onExit}>✕ EXIT TV MODE</button>
+        <button style={S.tvExitBtn} onClick={onExit}>✕ EXIT</button>
       </div>
 
+      {/* Champion takeover */}
       {champion && (
         <div style={S.tvChampionTakeover}>
           <div style={S.tvChampStars}>
-            {[...Array(5)].map((_, i) => <Star key={i} size={28} />)}
+            {[...Array(5)].map((_, i) => <Star key={i} size={40} />)}
           </div>
           <div style={S.tvChampLabel}>TOURNAMENT CHAMPIONS</div>
           <div style={S.tvChampNames}>
@@ -2168,42 +2177,35 @@ function TVDisplay({ data, onExit }) {
           <div style={S.tvChampSeed}>
             {champion.side === 'L' ? 'LEFT' : 'RIGHT'} BRACKET · SEED {champion.seed}
           </div>
+          <div style={S.tvChampSubline}>ATLAS SUPREME INVITATIONAL · {EVENT_DATE}</div>
         </div>
       )}
 
+      {/* Bracket view — main content when no champion */}
+      {!champion && (
+        <div style={{ flex: 1, overflow: 'hidden', minHeight: 0 }}>
+          <DesktopBracketView data={data} locked={true} />
+        </div>
+      )}
+
+      {/* Live match cards strip */}
       {!champion && liveSlot && (
-        <div style={S.tvLiveSection}>
-          <div style={S.tvSectionHeader}>
+        <div style={S.tvLiveBar}>
+          <div style={S.tvLiveBarHeader}>
             <span style={S.tvLiveDot} />
-            <span style={S.tvLiveLabel}>LIVE NOW</span>
-            <span style={S.tvLiveTime}>{liveSlot.time}</span>
-            {countdown && <span style={S.tvCountdown}>{countdown}</span>}
+            <span style={S.tvLiveBarLabel}>LIVE NOW</span>
+            <span style={S.tvLiveBarTime}>{liveSlot.time}</span>
           </div>
-          <div style={S.tvTablesGrid}>
+          <div style={S.tvLiveCardsRow}>
             {[0, 1, 2].map(i => (
-              <TVTableCard key={i} tableNum={liveSlot.tables[i]}
+              <TVLiveCard key={i} tableNum={liveSlot.tables[i]}
                 matchId={liveSlot.matchIds[i]} data={data} />
             ))}
           </div>
         </div>
       )}
 
-      {!champion && (
-        <div style={S.tvUpcomingSection}>
-          <div style={S.tvSectionHeader}>
-            <span style={S.tvUpcomingLabel}>SCHEDULE</span>
-          </div>
-          <div style={S.tvUpcomingList}>
-            {SCHEDULE_SLOTS.map((slot, idx) => {
-              const isLive = live.status === 'live' && live.index === idx;
-              if (isLive) return null;
-              const isPast = (live.status === 'live' && idx < live.index) || live.status === 'finished';
-              return <TVScheduleRow key={idx} slot={slot} data={data} isPast={isPast} />;
-            })}
-          </div>
-        </div>
-      )}
-
+      {/* Ticker */}
       <div style={S.tvTickerStrip}>
         <TVTicker stats={stats} data={data} />
       </div>
@@ -2211,79 +2213,46 @@ function TVDisplay({ data, onExit }) {
   );
 }
 
-function TVTableCard({ tableNum, matchId, data }) {
-  if (!matchId) {
-    return (
-      <div style={{ ...S.tvTableCard, ...S.tvTableCardEmpty }}>
-        <div style={S.tvTableNum}>{typeof tableNum === 'number' ? `TABLE ${tableNum}` : tableNum}</div>
-        <div style={S.tvTableEmpty}>Open / Warmup</div>
-      </div>
-    );
-  }
-  const m = data.matches[matchId];
-  const t1 = m.slots[0] ? data.teams[m.slots[0]] : null;
-  const t2 = m.slots[1] ? data.teams[m.slots[1]] : null;
+function TVLiveCard({ tableNum, matchId, data }) {
+  const m = matchId ? data.matches[matchId] : null;
+  const t1 = m?.slots[0] ? data.teams[m.slots[0]] : null;
+  const t2 = m?.slots[1] ? data.teams[m.slots[1]] : null;
   const p1a = t1?.playerIds[0] ? data.players.find(p => p.id === t1.playerIds[0]) : null;
   const p1b = t1?.playerIds[1] ? data.players.find(p => p.id === t1.playerIds[1]) : null;
   const p2a = t2?.playerIds[0] ? data.players.find(p => p.id === t2.playerIds[0]) : null;
   const p2b = t2?.playerIds[1] ? data.players.find(p => p.id === t2.playerIds[1]) : null;
+  const w1 = m?.winner && m.winner === m?.slots[0];
+  const w2 = m?.winner && m.winner === m?.slots[1];
 
   return (
-    <div style={S.tvTableCard}>
-      <div style={S.tvTableHeader}>
-        <div style={S.tvTableNum}>TABLE {tableNum}</div>
-        <div style={S.tvMatchLabel}>{matchLabel(matchId)}</div>
+    <div style={S.tvLiveCard}>
+      <div style={S.tvLiveCardHeader}>
+        <span style={S.tvLiveCardTable}>TABLE {tableNum}</span>
+        {matchId && <span style={S.tvLiveCardLabel}>{matchLabel(matchId)}</span>}
       </div>
-      <div style={S.tvTeam}>
-        <div style={S.tvSeed}>{t1?.seed || '—'}</div>
-        <div style={S.tvTeamPlayers}>
-          <div style={S.tvPlayerName}>{p1a?.name || '...'}</div>
-          <div style={S.tvPlayerName}>{p1b?.name || '...'}</div>
-        </div>
-      </div>
-      <div style={S.tvVsBig}>VS</div>
-      <div style={S.tvTeam}>
-        <div style={S.tvSeed}>{t2?.seed || '—'}</div>
-        <div style={S.tvTeamPlayers}>
-          <div style={S.tvPlayerName}>{p2a?.name || '...'}</div>
-          <div style={S.tvPlayerName}>{p2b?.name || '...'}</div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function TVScheduleRow({ slot, data, isPast }) {
-  return (
-    <div style={{ ...S.tvScheduleRow, ...(isPast ? S.tvScheduleRowPast : {}) }}>
-      <div style={S.tvScheduleTime}>{slot.time}</div>
-      <div style={S.tvScheduleTables}>
-        {[0, 1, 2].map(i => {
-          const mid = slot.matchIds[i];
-          const m = mid ? data.matches[mid] : null;
-          const t1 = m && m.slots[0] ? data.teams[m.slots[0]] : null;
-          const t2 = m && m.slots[1] ? data.teams[m.slots[1]] : null;
-          const w1 = m && m.winner === m.slots[0];
-          const w2 = m && m.winner === m.slots[1];
-          return (
-            <div key={i} style={S.tvScheduleCol}>
-              <div style={S.tvScheduleTableLbl}>T{slot.tables[i]}</div>
-              {mid ? (
-                <div>
-                  <div style={{ ...S.tvSchedulePair, ...(w1 ? S.tvScheduleWinner : {}) }}>
-                    {t1 ? `${t1.side}${t1.seed}` : '—'}
-                  </div>
-                  <div style={{ ...S.tvSchedulePair, ...(w2 ? S.tvScheduleWinner : {}) }}>
-                    {t2 ? `${t2.side}${t2.seed}` : '—'}
-                  </div>
-                </div>
-              ) : (
-                <div style={S.tvScheduleEmpty}>—</div>
-              )}
+      {!matchId || !m ? (
+        <div style={S.tvLiveCardEmpty}>OPEN</div>
+      ) : (
+        <div style={S.tvLiveCardBody}>
+          <div style={{ ...S.tvLiveTeam, ...(w1 ? S.tvLiveTeamWin : {}), ...(w2 ? S.tvLiveTeamLose : {}) }}>
+            <div style={S.tvLiveSeed}>{t1?.seed ?? '—'}</div>
+            <div style={S.tvLiveNames}>
+              <div style={S.tvLiveName}>{p1a?.name || '—'}</div>
+              <div style={S.tvLiveName}>{p1b?.name || '—'}</div>
             </div>
-          );
-        })}
-      </div>
+            {w1 && <div style={S.tvLiveWinCheck}>✓</div>}
+          </div>
+          <div style={S.tvLiveVs}>VS</div>
+          <div style={{ ...S.tvLiveTeam, ...(w2 ? S.tvLiveTeamWin : {}), ...(w1 ? S.tvLiveTeamLose : {}) }}>
+            <div style={S.tvLiveSeed}>{t2?.seed ?? '—'}</div>
+            <div style={S.tvLiveNames}>
+              <div style={S.tvLiveName}>{p2a?.name || '—'}</div>
+              <div style={S.tvLiveName}>{p2b?.name || '—'}</div>
+            </div>
+            {w2 && <div style={S.tvLiveWinCheck}>✓</div>}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -2302,9 +2271,7 @@ function TVTicker({ stats, data }) {
   if (stats.closestMatch) {
     items.push(`⚡ TIGHTEST GAME: WON BY ${stats.closestMatch.margin}`);
   }
-  if (items.length === 0) {
-    items.push('DREAM BIG · ATLAS SUPREME INVITATIONAL · BRING YOUR PADDLE');
-  }
+  items.push('DREAM BIG · ATLAS SUPREME INVITATIONAL · BRING YOUR PADDLE');
   const text = items.join('   ·   ');
   return <div style={S.tvTickerText}>{text}   ·   {text}</div>;
 }
@@ -3199,78 +3166,76 @@ const S = {
 
   // TV MODE
   tvShell: {
-    minHeight: '100vh', minWidth: '100vw',
+    height: '100vh', width: '100vw', overflow: 'hidden',
     background: `radial-gradient(ellipse at top, ${T.bgMid}, ${T.bgDeep})`,
     color: T.ivory,
     fontFamily: "'Barlow Condensed', sans-serif",
-    padding: 24,
-    display: 'flex', flexDirection: 'column', gap: 20,
+    padding: '12px 16px',
+    boxSizing: 'border-box',
+    display: 'flex', flexDirection: 'column', gap: 10,
   },
   tvBrandBar: {
-    display: 'flex', alignItems: 'center', gap: 24,
-    padding: '12px 20px',
-    background: 'rgba(0,0,0,0.4)', border: `1px solid ${T.gold}`, borderRadius: 10,
+    display: 'flex', alignItems: 'center', gap: 20,
+    padding: '10px 20px', flexShrink: 0,
+    background: 'rgba(0,0,0,0.5)', border: `1px solid ${T.gold}`, borderRadius: 10,
   },
   tvBrandLeft: { display: 'flex', alignItems: 'center', gap: 14, flex: 1 },
-  tvStarRow: { display: 'flex', gap: 4 },
-  tvBrandTitle: { fontFamily: "'Oswald', sans-serif", fontSize: 28, fontWeight: 700, letterSpacing: 4, color: T.ivory, lineHeight: 1 },
-  tvBrandSub: { fontFamily: "'Oswald', sans-serif", fontSize: 11, fontWeight: 600, letterSpacing: 3, color: T.gold, marginTop: 4 },
-  tvClock: { fontFamily: "'Oswald', sans-serif", fontSize: 32, fontWeight: 700, color: T.goldBr, letterSpacing: 2 },
+  tvStarRow: { display: 'flex', gap: 5 },
+  tvBrandTitle: { fontFamily: "'Oswald', sans-serif", fontSize: 34, fontWeight: 700, letterSpacing: 5, color: T.ivory, lineHeight: 1 },
+  tvBrandSub: { fontFamily: "'Oswald', sans-serif", fontSize: 13, fontWeight: 600, letterSpacing: 3, color: T.gold, marginTop: 4 },
+  tvTopCountdown: { display: 'flex', alignItems: 'center', gap: 10, padding: '6px 16px', background: 'rgba(200,50,50,0.15)', border: `1px solid ${T.red}`, borderRadius: 8 },
+  tvTopCountdownText: { fontFamily: "'Oswald', sans-serif", fontSize: 28, fontWeight: 700, color: T.red, letterSpacing: 2 },
+  tvClock: { fontFamily: "'Oswald', sans-serif", fontSize: 38, fontWeight: 700, color: T.goldBr, letterSpacing: 2 },
   tvExitBtn: {
-    background: 'rgba(212,165,75,0.18)', color: T.gold, border: `1px solid ${T.gold}`,
-    padding: '8px 16px', borderRadius: 6, cursor: 'pointer',
-    fontFamily: "'Oswald', sans-serif", fontSize: 11, fontWeight: 700, letterSpacing: 2,
+    background: 'rgba(212,165,75,0.12)', color: T.gold, border: `1px solid ${T.gold}`,
+    padding: '8px 14px', borderRadius: 6, cursor: 'pointer',
+    fontFamily: "'Oswald', sans-serif", fontSize: 12, fontWeight: 700, letterSpacing: 2,
+    flexShrink: 0,
   },
   tvChampionTakeover: {
     flex: 1, display: 'flex', flexDirection: 'column',
-    alignItems: 'center', justifyContent: 'center', gap: 12,
-    background: `radial-gradient(ellipse at center, rgba(212,165,75,0.25), transparent)`,
+    alignItems: 'center', justifyContent: 'center', gap: 16,
+    background: `radial-gradient(ellipse at center, rgba(212,165,75,0.3), transparent 70%)`,
   },
-  tvChampStars: { display: 'flex', gap: 8, marginBottom: 12 },
-  tvChampLabel: { fontFamily: "'Oswald', sans-serif", fontSize: 18, fontWeight: 600, letterSpacing: 6, color: T.gold },
-  tvChampNames: { fontFamily: "'Oswald', sans-serif", fontSize: 64, fontWeight: 700, color: T.ivory, textAlign: 'center', lineHeight: 1.1, letterSpacing: 1 },
-  tvChampSeed: { fontFamily: "'Oswald', sans-serif", fontSize: 16, fontWeight: 600, letterSpacing: 4, color: T.goldBr, marginTop: 16 },
-  tvLiveSection: { background: 'rgba(0,0,0,0.4)', border: `1px solid ${T.red}`, borderRadius: 10, padding: 16 },
-  tvSectionHeader: { display: 'flex', alignItems: 'center', gap: 12, marginBottom: 14 },
-  tvLiveDot: { width: 12, height: 12, borderRadius: '50%', background: T.red, animation: 'pulse 1.5s infinite' },
-  tvLiveLabel: { fontFamily: "'Oswald', sans-serif", fontSize: 14, fontWeight: 700, letterSpacing: 3, color: T.red },
-  tvLiveTime: { fontFamily: "'Oswald', sans-serif", fontSize: 16, fontWeight: 700, color: T.ivory, letterSpacing: 1 },
-  tvCountdown: { marginLeft: 'auto', fontFamily: "'Oswald', sans-serif", fontSize: 22, fontWeight: 700, color: T.goldBr, letterSpacing: 2 },
-  tvUpcomingLabel: { fontFamily: "'Oswald', sans-serif", fontSize: 14, fontWeight: 700, letterSpacing: 3, color: T.gold },
-  tvTablesGrid: { display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12 },
-  tvTableCard: {
-    background: T.bgCard, border: `1px solid ${T.gold}`, borderRadius: 8,
-    padding: 14, display: 'flex', flexDirection: 'column', gap: 8,
+  tvChampStars: { display: 'flex', gap: 10, marginBottom: 8 },
+  tvChampLabel: { fontFamily: "'Oswald', sans-serif", fontSize: 22, fontWeight: 600, letterSpacing: 8, color: T.gold },
+  tvChampNames: { fontFamily: "'Oswald', sans-serif", fontSize: 96, fontWeight: 700, color: T.ivory, textAlign: 'center', lineHeight: 1.05, letterSpacing: 2 },
+  tvChampSeed: { fontFamily: "'Oswald', sans-serif", fontSize: 20, fontWeight: 600, letterSpacing: 5, color: T.goldBr, marginTop: 8 },
+  tvChampSubline: { fontFamily: "'Oswald', sans-serif", fontSize: 14, fontWeight: 500, letterSpacing: 4, color: 'rgba(212,165,75,0.5)', marginTop: 4 },
+  tvLiveDot: { width: 14, height: 14, borderRadius: '50%', background: T.red, animation: 'pulse 1.5s infinite', flexShrink: 0 },
+  tvLiveBar: {
+    flexShrink: 0,
+    background: 'rgba(0,0,0,0.55)', border: `1px solid ${T.red}`, borderRadius: 10,
+    padding: '10px 14px',
   },
-  tvTableCardEmpty: { borderColor: T.rim, opacity: 0.5 },
-  tvTableHeader: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: `1px solid ${T.rim}`, paddingBottom: 6 },
-  tvTableNum: { fontFamily: "'Oswald', sans-serif", fontSize: 16, fontWeight: 700, letterSpacing: 2, color: T.goldBr },
-  tvMatchLabel: { fontFamily: "'Oswald', sans-serif", fontSize: 10, fontWeight: 600, letterSpacing: 1.5, color: T.gold },
-  tvTableEmpty: { fontFamily: "'Barlow Condensed', sans-serif", fontSize: 14, color: 'rgba(245,238,220,0.5)', fontStyle: 'italic', textAlign: 'center', padding: 20 },
-  tvTeam: { display: 'flex', gap: 10, alignItems: 'center', padding: '6px 0' },
-  tvSeed: { fontFamily: "'Oswald', sans-serif", fontSize: 24, fontWeight: 700, color: T.goldBr, minWidth: 32, textAlign: 'center' },
-  tvTeamPlayers: { flex: 1, minWidth: 0 },
-  tvPlayerName: { fontFamily: "'Oswald', sans-serif", fontSize: 14, fontWeight: 600, color: T.ivory, lineHeight: 1.3, textTransform: 'uppercase', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
-  tvVsBig: { fontFamily: "'Oswald', sans-serif", fontSize: 11, fontWeight: 600, color: T.gold, letterSpacing: 2, textAlign: 'center' },
-
-  tvUpcomingSection: { background: 'rgba(0,0,0,0.4)', border: `1px solid ${T.rim}`, borderRadius: 10, padding: 16, flex: 1 },
-  tvUpcomingList: { display: 'flex', flexDirection: 'column', gap: 6 },
-  tvScheduleRow: { display: 'flex', gap: 16, padding: '6px 8px', borderBottom: `1px solid ${T.rim}`, alignItems: 'center' },
-  tvScheduleRowPast: { opacity: 0.3 },
-  tvScheduleTime: { fontFamily: "'Oswald', sans-serif", fontSize: 13, fontWeight: 700, color: T.gold, minWidth: 100, letterSpacing: 1 },
-  tvScheduleTables: { display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16, flex: 1 },
-  tvScheduleCol: { display: 'flex', alignItems: 'center', gap: 8 },
-  tvScheduleTableLbl: { fontFamily: "'Oswald', sans-serif", fontSize: 9, color: T.gold, opacity: 0.7, minWidth: 22, letterSpacing: 1 },
-  tvSchedulePair: { fontFamily: "'Oswald', sans-serif", fontSize: 11, color: T.ivory, letterSpacing: 0.5 },
-  tvScheduleWinner: { color: T.goldBr, fontWeight: 700 },
-  tvScheduleEmpty: { color: 'rgba(245,238,220,0.3)', fontFamily: "'Barlow Condensed', sans-serif", fontSize: 11 },
+  tvLiveBarHeader: { display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 },
+  tvLiveBarLabel: { fontFamily: "'Oswald', sans-serif", fontSize: 16, fontWeight: 700, letterSpacing: 4, color: T.red },
+  tvLiveBarTime: { fontFamily: "'Oswald', sans-serif", fontSize: 16, fontWeight: 600, color: T.ivory, letterSpacing: 1, opacity: 0.8 },
+  tvLiveCardsRow: { display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12 },
+  tvLiveCard: {
+    background: T.bgCard, border: `1px solid ${T.gold}`, borderRadius: 10,
+    padding: '12px 16px', display: 'flex', flexDirection: 'column', gap: 8,
+  },
+  tvLiveCardHeader: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: `1px solid ${T.rim}`, paddingBottom: 8, marginBottom: 2 },
+  tvLiveCardTable: { fontFamily: "'Oswald', sans-serif", fontSize: 20, fontWeight: 700, letterSpacing: 2, color: T.goldBr },
+  tvLiveCardLabel: { fontFamily: "'Oswald', sans-serif", fontSize: 11, fontWeight: 600, letterSpacing: 1.5, color: T.gold, opacity: 0.8 },
+  tvLiveCardEmpty: { fontFamily: "'Oswald', sans-serif", fontSize: 18, color: 'rgba(245,238,220,0.3)', textAlign: 'center', padding: '12px 0' },
+  tvLiveCardBody: { display: 'flex', flexDirection: 'column', gap: 4 },
+  tvLiveTeam: { display: 'flex', alignItems: 'center', gap: 12, padding: '4px 0' },
+  tvLiveTeamWin: { opacity: 1 },
+  tvLiveTeamLose: { opacity: 0.4 },
+  tvLiveSeed: { fontFamily: "'Oswald', sans-serif", fontSize: 32, fontWeight: 700, color: T.goldBr, minWidth: 40, textAlign: 'center', lineHeight: 1 },
+  tvLiveNames: { flex: 1, minWidth: 0 },
+  tvLiveName: { fontFamily: "'Oswald', sans-serif", fontSize: 22, fontWeight: 600, color: T.ivory, lineHeight: 1.25, textTransform: 'uppercase', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
+  tvLiveVs: { fontFamily: "'Oswald', sans-serif", fontSize: 13, fontWeight: 700, color: T.gold, letterSpacing: 3, textAlign: 'center', padding: '2px 0' },
+  tvLiveWinCheck: { fontFamily: "'Oswald', sans-serif", fontSize: 24, color: T.gold, fontWeight: 700, flexShrink: 0 },
 
   tvTickerStrip: {
     background: 'rgba(0,0,0,0.5)', border: `1px solid ${T.gold}`, borderRadius: 6,
-    padding: '8px 0', overflow: 'hidden', whiteSpace: 'nowrap',
+    padding: '8px 0', overflow: 'hidden', whiteSpace: 'nowrap', flexShrink: 0,
   },
   tvTickerText: {
-    fontFamily: "'Oswald', sans-serif", fontSize: 14, fontWeight: 600, letterSpacing: 2,
+    fontFamily: "'Oswald', sans-serif", fontSize: 16, fontWeight: 600, letterSpacing: 2,
     color: T.goldBr, paddingLeft: '100%',
     animation: 'ticker 60s linear infinite',
   },
