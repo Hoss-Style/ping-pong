@@ -1204,6 +1204,199 @@ function DesktopBracketView({ data, onTeamTap, onScoreEdit, onShareMatch, locked
   );
 }
 
+// ═══════════════════════════════════════════════════════════════════════════
+// TV BRACKET VIEW — read-only, oversized championship card
+// ═══════════════════════════════════════════════════════════════════════════
+function TVBracketView({ data }) {
+  const MH = 130, MW = 220, HG = 22, VG = 18, PAD = 40;
+  const MH_F = 300, MW_F = 360; // final card: ~2.3× taller, 1.6× wider
+  const containerRef = useRef(null);
+  const [scale, setScale] = useState(1);
+  const UNIT = MH + VG;
+
+  const rc = [0,1,2,3].map(i => i * UNIT + MH / 2);
+  const qc = [[0,1],[2,3]].map(([a,b]) => (rc[a] + rc[b]) / 2);
+  const sc = (qc[0] + qc[1]) / 2;
+
+  const rt = rc.map(c => c - MH / 2);
+  const qt = qc.map(c => c - MH / 2);
+  const st = sc - MH / 2;
+  const finalTop = sc - MH_F / 2;
+  const totalH = rt[3] + MH + PAD * 2;
+
+  const C = {};
+  C.piX  = 0;
+  C.r1X  = MW + HG;
+  C.qfX  = C.r1X  + MW + HG;
+  C.sfX  = C.qfX  + MW + HG;
+  C.finX = C.sfX  + MW + HG;
+  C.rsfX = C.finX + MW_F + HG; // wider gap because final card is wider
+  C.rqfX = C.rsfX + MW + HG;
+  C.rr1X = C.rqfX + MW + HG;
+  C.rpiX = C.rr1X + MW + HG;
+  const totalW = C.rpiX + MW;
+
+  useEffect(() => {
+    const compute = () => {
+      if (!containerRef.current) return;
+      const available = containerRef.current.offsetWidth - 32;
+      setScale(available / totalW);
+    };
+    compute();
+    window.addEventListener('resize', compute);
+    return () => window.removeEventListener('resize', compute);
+  }, [totalW]);
+
+  const Y = c => PAD + c;
+  const lp = { stroke: T.gold, strokeWidth: 1.5, opacity: 0.4, strokeLinecap: 'round' };
+
+  const pairLines = (prefix, x1, x2, ya, yb, ymid) => {
+    const xm = x1 + HG / 2;
+    return [
+      <line key={`${prefix}a`} x1={x1} y1={ya}   x2={xm} y2={ya}   {...lp} />,
+      <line key={`${prefix}b`} x1={x1} y1={yb}   x2={xm} y2={yb}   {...lp} />,
+      <line key={`${prefix}v`} x1={xm} y1={ya}   x2={xm} y2={yb}   {...lp} />,
+      <line key={`${prefix}m`} x1={xm} y1={ymid} x2={x2} y2={ymid} {...lp} />,
+    ];
+  };
+
+  const svgLines = [
+    <line key="l-pi"  x1={C.piX+MW}   y1={Y(rc[0])} x2={C.r1X}       y2={Y(rc[0])} {...lp} />,
+    ...pairLines('l-r1a', C.r1X+MW,    C.qfX,         Y(rc[0]), Y(rc[1]), Y(qc[0])),
+    ...pairLines('l-r1b', C.r1X+MW,    C.qfX,         Y(rc[2]), Y(rc[3]), Y(qc[1])),
+    ...pairLines('l-qf',  C.qfX+MW,    C.sfX,         Y(qc[0]), Y(qc[1]), Y(sc)),
+    <line key="l-sf"  x1={C.sfX+MW}   y1={Y(sc)}    x2={C.finX}      y2={Y(sc)}    {...lp} />,
+    <line key="r-sf"  x1={C.finX+MW_F} y1={Y(sc)}   x2={C.rsfX}      y2={Y(sc)}    {...lp} />,
+    ...pairLines('r-qf',  C.rqfX,       C.rsfX+MW,    Y(qc[0]), Y(qc[1]), Y(sc)),
+    ...pairLines('r-r1a', C.rr1X,       C.rqfX+MW,    Y(rc[0]), Y(rc[1]), Y(qc[0])),
+    ...pairLines('r-r1b', C.rr1X,       C.rqfX+MW,    Y(rc[2]), Y(rc[3]), Y(qc[1])),
+    <line key="r-pi"  x1={C.rr1X+MW}  y1={Y(rc[0])} x2={C.rpiX}      y2={Y(rc[0])} {...lp} />,
+  ];
+
+  const mc  = (mid, x, top) => (
+    <div key={mid} style={{ position: 'absolute', left: x, top: PAD + top }}>
+      <TVMatchCard matchId={mid} data={data} width={MW} />
+    </div>
+  );
+  const mcF = (mid, x, top) => (
+    <div key={mid} style={{ position: 'absolute', left: x, top: PAD + top }}>
+      <TVMatchCard matchId={mid} data={data} width={MW_F} isFinal />
+    </div>
+  );
+
+  const LABELS = [
+    [C.piX, 'PLAY-IN'], [C.r1X, 'ROUND OF 16'], [C.qfX, 'QUARTERFINALS'],
+    [C.sfX, 'SEMIFINALS'], [C.finX, 'CHAMPIONSHIP'], [C.rsfX, 'SEMIFINALS'],
+    [C.rqfX, 'QUARTERFINALS'], [C.rr1X, 'ROUND OF 16'], [C.rpiX, 'PLAY-IN'],
+  ];
+  const LABEL_WIDTHS = { [C.finX]: MW_F };
+
+  const innerH = 28 + totalH;
+
+  return (
+    <div ref={containerRef} style={S.desktopWrap}>
+      <div style={{ transformOrigin: 'top left', transform: `scale(${scale})`, width: totalW, position: 'relative' }}>
+        <div style={{ position: 'relative', width: totalW, height: 28, marginBottom: 10 }}>
+          {LABELS.map(([x, label]) => (
+            <div key={label + x} style={{ ...S.dmcColLabel, left: x, width: LABEL_WIDTHS[x] ?? MW }}>{label}</div>
+          ))}
+        </div>
+        <div style={{ position: 'relative', width: totalW, height: totalH }}>
+          <svg style={{ position: 'absolute', inset: 0, width: totalW, height: totalH, pointerEvents: 'none' }}>
+            {svgLines}
+          </svg>
+          {mc('L_PI',   C.piX,  rt[0])}
+          {mc('L_R1_1', C.r1X,  rt[0])} {mc('L_R1_2', C.r1X, rt[1])}
+          {mc('L_R1_3', C.r1X,  rt[2])} {mc('L_R1_4', C.r1X, rt[3])}
+          {mc('L_QF_1', C.qfX,  qt[0])} {mc('L_QF_2', C.qfX, qt[1])}
+          {mc('L_SF',   C.sfX,  st)}
+          {mcF('FINAL', C.finX, finalTop)}
+          {mc('R_SF',   C.rsfX, st)}
+          {mc('R_QF_1', C.rqfX, qt[0])} {mc('R_QF_2', C.rqfX, qt[1])}
+          {mc('R_R1_1', C.rr1X, rt[0])} {mc('R_R1_2', C.rr1X, rt[1])}
+          {mc('R_R1_3', C.rr1X, rt[2])} {mc('R_R1_4', C.rr1X, rt[3])}
+          {mc('R_PI',   C.rpiX, rt[0])}
+        </div>
+      </div>
+      <div style={{ height: innerH * scale, flexShrink: 0 }} />
+    </div>
+  );
+}
+
+function TVMatchCard({ matchId, data, width, isFinal = false }) {
+  const match = data.matches[matchId];
+  if (!match) return null;
+
+  const renderSlot = (slotIdx) => {
+    const teamId = match.slots[slotIdx];
+    const isWinner = match.winner === teamId && !!teamId;
+    const isLoser  = !!match.winner && match.winner !== teamId && !!teamId;
+    const champWin = isFinal && isWinner;
+
+    if (!teamId) {
+      const isPI = (matchId === 'L_R1_1' || matchId === 'R_R1_1') && slotIdx === 1;
+      return (
+        <div style={{ ...S.tvmcSlot, opacity: 0.3 }}>
+          <span style={S.tvmcSeed}>–</span>
+          <span style={{ ...S.tvmcName, ...(isFinal ? S.tvmcNameFinal : {}) }}>{isPI ? 'PI WINNER' : 'TBD'}</span>
+        </div>
+      );
+    }
+
+    const team = data.teams[teamId];
+    const p1 = team.playerIds[0] ? data.players.find(p => p.id === team.playerIds[0]) : null;
+    const p2 = team.playerIds[1] ? data.players.find(p => p.id === team.playerIds[1]) : null;
+
+    return (
+      <div style={{
+        ...S.tvmcSlot,
+        ...(isWinner && !champWin ? S.tvmcSlotWin : {}),
+        ...(champWin ? S.tvmcSlotChamp : {}),
+        ...(isLoser ? S.tvmcSlotLose : {}),
+        ...(isFinal ? S.tvmcSlotFinalPad : {}),
+      }}>
+        <span style={{ ...S.tvmcSeed, ...(isFinal ? S.tvmcSeedFinal : {}), ...(champWin ? { color: T.bgDeep } : {}) }}>
+          {team.seed}
+        </span>
+        <div style={S.tvmcNames}>
+          <div style={{ ...S.tvmcName, ...(isFinal ? S.tvmcNameFinal : {}), ...(champWin ? { color: T.bgDeep } : {}) }}>
+            {p1?.name || '—'}
+          </div>
+          <div style={{ ...S.tvmcName, ...(isFinal ? S.tvmcNameFinal : {}), ...(champWin ? { color: T.bgDeep } : {}) }}>
+            {p2?.name || '—'}
+          </div>
+        </div>
+        {isWinner && (
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none"
+               stroke={champWin ? T.bgDeep : T.gold} strokeWidth="3" style={{ flexShrink: 0 }}>
+            <path d="M5 12l5 5L20 7" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
+        )}
+      </div>
+    );
+  };
+
+  const shortLabel = matchLabel(matchId).replace('LEFT · ', 'L · ').replace('RIGHT · ', 'R · ');
+
+  return (
+    <div style={{
+      ...S.dmc, width,
+      ...(isFinal ? {
+        border: `2px solid ${T.gold}`,
+        boxShadow: `0 0 32px rgba(212,165,75,0.5), inset 0 0 24px rgba(212,165,75,0.07)`,
+        borderRadius: 12,
+      } : {}),
+    }}>
+      <div style={{ ...S.tvmcHeader, ...(isFinal ? S.tvmcHeaderFinal : {}) }}>
+        <span style={{ ...S.tvmcLabel, ...(isFinal ? S.tvmcLabelFinal : {}) }}>{shortLabel}</span>
+      </div>
+      {renderSlot(0)}
+      <div style={S.dmcDivider} />
+      {renderSlot(1)}
+    </div>
+  );
+}
+
 function DesktopMatchCard({ matchId, data, onTeamTap, onScoreEdit, onShareMatch, locked, width, isFinalCard }) {
   const match = data.matches[matchId];
   if (!match) return null;
@@ -2198,7 +2391,7 @@ function TVDisplay({ data, onExit }) {
       {/* Bracket view — main content when no champion */}
       {!champion && (
         <div style={{ flex: 1, overflow: 'hidden', minHeight: 0 }}>
-          <DesktopBracketView data={data} locked={true} />
+          <TVBracketView data={data} />
         </div>
       )}
 
@@ -3349,6 +3542,22 @@ const S = {
     color: T.goldBr, paddingLeft: '100%',
     animation: 'ticker 60s linear infinite',
   },
+
+  // TV Match Card (used in TVBracketView)
+  tvmcHeader:      { display: 'flex', alignItems: 'center', padding: '4px 8px', background: T.bgSoft, borderBottom: `1px solid ${T.rim}`, flexShrink: 0 },
+  tvmcHeaderFinal: { background: T.goldDark, borderBottom: `1px solid ${T.gold}`, padding: '8px 12px' },
+  tvmcLabel:       { color: T.ivoryDim, fontSize: 10, fontFamily: 'Oswald, sans-serif', letterSpacing: 0.8, opacity: 0.75 },
+  tvmcLabelFinal:  { color: T.goldGlow, fontSize: 13, fontWeight: 700, letterSpacing: 2, opacity: 1 },
+  tvmcSlot:        { display: 'flex', alignItems: 'center', gap: 8, padding: '8px 10px', flex: 1, minHeight: 0 },
+  tvmcSlotFinalPad:{ padding: '16px 14px' },
+  tvmcSlotWin:     { background: T.gold },
+  tvmcSlotChamp:   { background: T.goldGlow },
+  tvmcSlotLose:    { opacity: 0.35 },
+  tvmcSeed:        { color: T.gold, fontSize: 16, fontWeight: 700, fontFamily: 'Oswald, sans-serif', minWidth: 22, textAlign: 'center', flexShrink: 0 },
+  tvmcSeedFinal:   { fontSize: 30, minWidth: 36, color: T.goldBr },
+  tvmcNames:       { flex: 1, minWidth: 0 },
+  tvmcName:        { color: T.ivory, fontSize: 14, fontFamily: 'Barlow Condensed, sans-serif', fontWeight: 600, lineHeight: 1.25, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
+  tvmcNameFinal:   { fontSize: 26, fontWeight: 700, fontFamily: 'Oswald, sans-serif', letterSpacing: 0.5 },
 
   // TV Schedule display
   tvSchedGrid: { flex: 1, display: 'flex', flexDirection: 'column', gap: 8, overflow: 'hidden', minHeight: 0 },
