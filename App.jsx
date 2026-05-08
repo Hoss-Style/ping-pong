@@ -1073,7 +1073,7 @@ function PlayerSlot({ player, num, onTap, onRemove, editMode, isChamp, locked })
 // DESKTOP BRACKET — March Madness style for screens ≥ 960px
 // ═══════════════════════════════════════════════════════════════════════════
 function DesktopBracketView({ data, onTeamTap, onScoreEdit, onShareMatch, locked }) {
-  const MH = 82, MW = 172, HG = 30, VG = 22, PAD = 44;
+  const MH = 120, MW = 210, HG = 20, VG = 18, PAD = 48;
   const containerRef = useRef(null);
   const [scale, setScale] = useState(1);
   const UNIT = MH + VG;
@@ -1243,10 +1243,10 @@ function DesktopMatchCard({ matchId, data, onTeamTap, onScoreEdit, onShareMatch,
           {team.seed}{team.pi && <span style={S.dmcPiTag}>PI</span>}
         </span>
         <div style={S.dmcPlayerNames}>
-          <div style={{ ...S.dmcPName, ...(champWin ? { color: T.bgDeep } : {}), ...(isFinalCard ? { fontSize: 12, fontWeight: 700 } : {}) }}>
+          <div style={{ ...S.dmcPName, ...(champWin ? { color: T.bgDeep } : {}), ...(isFinalCard ? { fontSize: 16, fontWeight: 700 } : {}) }}>
             {p1 ? p1.name : '…'}
           </div>
-          <div style={{ ...S.dmcPName, ...(champWin ? { color: T.bgDeep } : {}), ...(isFinalCard ? { fontSize: 12, fontWeight: 700 } : {}) }}>
+          <div style={{ ...S.dmcPName, ...(champWin ? { color: T.bgDeep } : {}), ...(isFinalCard ? { fontSize: 16, fontWeight: 700 } : {}) }}>
             {p2 ? p2.name : '…'}
           </div>
         </div>
@@ -3307,21 +3307,21 @@ const S = {
   dmcColLabel:    { position: 'absolute', textAlign: 'center', color: T.gold, fontSize: 13, fontFamily: 'Oswald, sans-serif', letterSpacing: 2, opacity: 0.85, pointerEvents: 'none' },
   dmc:            { background: T.bgCard, border: `1px solid ${T.rim}`, borderRadius: 7, overflow: 'hidden', display: 'flex', flexDirection: 'column' },
   dmcHeader:      { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '3px 6px', background: T.bgSoft, borderBottom: `1px solid ${T.rim}`, flexShrink: 0 },
-  dmcLabel:       { color: T.ivoryDim, fontSize: 9, fontFamily: 'Oswald, sans-serif', letterSpacing: 0.8, opacity: 0.75 },
+  dmcLabel:       { color: T.ivoryDim, fontSize: 11, fontFamily: 'Oswald, sans-serif', letterSpacing: 0.8, opacity: 0.75 },
   dmcBtns:        { display: 'flex', gap: 2 },
   dmcBtn:         { background: 'transparent', border: 'none', cursor: 'pointer', fontSize: 11, padding: '0 2px', opacity: 0.7, lineHeight: 1 },
-  dmcSlot:        { display: 'flex', alignItems: 'center', gap: 5, padding: '5px 6px', flex: 1, minHeight: 0 },
+  dmcSlot:        { display: 'flex', alignItems: 'center', gap: 7, padding: '7px 9px', flex: 1, minHeight: 0 },
   dmcSlotWin:     { background: T.gold },
   dmcSlotChamp:   { background: T.goldGlow },
   dmcSlotLose:    { opacity: 0.4 },
-  dmcSlotEmpty:   { display: 'flex', alignItems: 'center', gap: 5, padding: '5px 6px', flex: 1, opacity: 0.3 },
+  dmcSlotEmpty:   { display: 'flex', alignItems: 'center', gap: 7, padding: '7px 9px', flex: 1, opacity: 0.3 },
   dmcDivider:     { height: 1, background: T.rim, flexShrink: 0 },
-  dmcSeed:        { color: T.gold, fontSize: 11, fontWeight: 700, fontFamily: 'Oswald, sans-serif', minWidth: 14, textAlign: 'center', flexShrink: 0 },
-  dmcSeedEmpty:   { color: T.ivoryDim, fontSize: 11, fontFamily: 'Oswald, sans-serif', minWidth: 14, textAlign: 'center', flexShrink: 0 },
-  dmcPiTag:       { fontSize: 7, marginLeft: 1, opacity: 0.7 },
-  dmcPlayerNames: { display: 'flex', flexDirection: 'column', flex: 1, minWidth: 0, gap: 1 },
-  dmcPName:       { color: T.ivory, fontSize: 10, fontFamily: 'Barlow Condensed, sans-serif', fontWeight: 600, lineHeight: 1.2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
-  dmcNameTbd:     { color: T.ivoryDim, fontSize: 10, fontFamily: 'Barlow Condensed, sans-serif' },
+  dmcSeed:        { color: T.gold, fontSize: 14, fontWeight: 700, fontFamily: 'Oswald, sans-serif', minWidth: 18, textAlign: 'center', flexShrink: 0 },
+  dmcSeedEmpty:   { color: T.ivoryDim, fontSize: 14, fontFamily: 'Oswald, sans-serif', minWidth: 18, textAlign: 'center', flexShrink: 0 },
+  dmcPiTag:       { fontSize: 8, marginLeft: 1, opacity: 0.7 },
+  dmcPlayerNames: { display: 'flex', flexDirection: 'column', flex: 1, minWidth: 0, gap: 2 },
+  dmcPName:       { color: T.ivory, fontSize: 13, fontFamily: 'Barlow Condensed, sans-serif', fontWeight: 600, lineHeight: 1.2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
+  dmcNameTbd:     { color: T.ivoryDim, fontSize: 13, fontFamily: 'Barlow Condensed, sans-serif' },
 
   // Auth
   loginBtn:     { background: 'transparent', border: 'none', color: T.bgSoft, padding: '4px 8px', borderRadius: 6, cursor: 'pointer', fontSize: 11, fontFamily: 'Oswald, sans-serif', letterSpacing: 1, opacity: 0.5 },
