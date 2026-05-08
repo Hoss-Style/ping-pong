@@ -188,11 +188,18 @@ function makeDefaultData() {
     if (!matches[m]) matches[m] = makeMatch();
   });
 
-  return { players, teams, matches, locked: false };
+  return { players, teams, matches, locked: false, scheduleTimes: Array(SCHEDULE_SLOTS.length).fill(null) };
 }
 
 function makeMatch() {
   return { slots: [null, null], winner: null, scores: { team1: [], team2: [] }, isForfeit: false };
+}
+
+function getEffectiveSlots(data) {
+  return SCHEDULE_SLOTS.map((slot, i) => {
+    const override = data?.scheduleTimes?.[i];
+    return override ? { ...slot, time: override } : slot;
+  });
 }
 
 function matchLabel(matchId) {
@@ -231,7 +238,7 @@ function parseSlotTime(timeStr) {
   return { start: parse(startStr), end: parse(endStr) };
 }
 
-function getLiveSlotInfo() {
+function getLiveSlotInfo(schedSlots = SCHEDULE_SLOTS) {
   const now = new Date();
   const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
   const eventDay = new Date(2026, 4, 14); // May 14 2026
@@ -241,22 +248,22 @@ function getLiveSlotInfo() {
     return { status: 'upcoming', index: 0, daysUntil };
   }
   if (today > eventDay) {
-    return { status: 'finished', index: SCHEDULE_SLOTS.length - 1 };
+    return { status: 'finished', index: schedSlots.length - 1 };
   }
   // Event day — use clock
-  const slots = SCHEDULE_SLOTS.map(s => parseSlotTime(s.time));
-  for (let i = 0; i < slots.length; i++) {
-    if (now >= slots[i].start && now <= slots[i].end) return { status: 'live', index: i };
+  const parsed = schedSlots.map(s => parseSlotTime(s.time));
+  for (let i = 0; i < parsed.length; i++) {
+    if (now >= parsed[i].start && now <= parsed[i].end) return { status: 'live', index: i };
   }
-  if (now < slots[0].start) {
-    return { status: 'upcoming', index: 0, minutesUntil: Math.ceil((slots[0].start - now) / 60000) };
+  if (now < parsed[0].start) {
+    return { status: 'upcoming', index: 0, minutesUntil: Math.ceil((parsed[0].start - now) / 60000) };
   }
-  for (let i = 0; i < slots.length - 1; i++) {
-    if (now > slots[i].end && now < slots[i+1].start) {
-      return { status: 'upcoming', index: i+1, minutesUntil: Math.ceil((slots[i+1].start - now) / 60000) };
+  for (let i = 0; i < parsed.length - 1; i++) {
+    if (now > parsed[i].end && now < parsed[i+1].start) {
+      return { status: 'upcoming', index: i+1, minutesUntil: Math.ceil((parsed[i+1].start - now) / 60000) };
     }
   }
-  return { status: 'finished', index: slots.length - 1 };
+  return { status: 'finished', index: parsed.length - 1 };
 }
 
 // Compute hot-takes / leaderboards from current data
@@ -744,7 +751,15 @@ export default function App() {
             />
           ))}
           {tab === 'schedule' && (
-            <ScheduleView data={data} tableFilter={tableFilter} setTableFilter={setTableFilter} />
+            <ScheduleView data={data} tableFilter={tableFilter} setTableFilter={setTableFilter}
+              isAdmin={isAdmin}
+              onTimeEdit={(idx, newTime) => {
+                const next = cloneData(data);
+                if (!next.scheduleTimes) next.scheduleTimes = Array(SCHEDULE_SLOTS.length).fill(null);
+                next.scheduleTimes[idx] = newTime;
+                setData(next);
+              }}
+            />
           )}
           {tab === 'players' && (
             <PlayersView
@@ -1560,13 +1575,14 @@ function SeedEditor({ data, side, currentSeed, onClose, onReassign }) {
 // ═══════════════════════════════════════════════════════════════════════════
 // SCHEDULE VIEW
 // ═══════════════════════════════════════════════════════════════════════════
-function ScheduleView({ data, tableFilter, setTableFilter }) {
+function ScheduleView({ data, tableFilter, setTableFilter, isAdmin, onTimeEdit }) {
   const [, setTick] = useState(0);
   useEffect(() => {
     const id = setInterval(() => setTick(t => t + 1), 30000);
     return () => clearInterval(id);
   }, []);
-  const live = getLiveSlotInfo();
+  const slots = getEffectiveSlots(data);
+  const live = getLiveSlotInfo(slots);
 
   return (
     <div style={S.scheduleView}>
@@ -1592,7 +1608,7 @@ function ScheduleView({ data, tableFilter, setTableFilter }) {
         <div style={S.liveBanner}>
           <span style={S.liveDot} />
           <span style={S.liveLabel}>LIVE NOW</span>
-          <span style={S.liveTime}>{SCHEDULE_SLOTS[live.index].time}</span>
+          <span style={S.liveTime}>{slots[live.index].time}</span>
         </div>
       )}
       {live.status === 'upcoming' && live.daysUntil > 0 && (
@@ -1612,11 +1628,12 @@ function ScheduleView({ data, tableFilter, setTableFilter }) {
       )}
 
       <div>
-        {SCHEDULE_SLOTS.map((slot, idx) => (
-          <TimeSlot key={idx} slot={slot} data={data} tableFilter={tableFilter}
+        {slots.map((slot, idx) => (
+          <TimeSlot key={idx} slot={slot} slotIdx={idx} data={data} tableFilter={tableFilter}
             isLive={live.status === 'live' && live.index === idx}
             isPast={(live.status === 'live' && idx < live.index) || live.status === 'finished'}
-            isNext={live.status === 'live' && live.index + 1 === idx} />
+            isNext={live.status === 'live' && live.index + 1 === idx}
+            isAdmin={isAdmin} onTimeEdit={onTimeEdit} />
         ))}
       </div>
 
@@ -1629,14 +1646,38 @@ function ScheduleView({ data, tableFilter, setTableFilter }) {
   );
 }
 
-function TimeSlot({ slot, data, tableFilter, isLive, isPast, isNext }) {
+function TimeSlot({ slot, slotIdx, data, tableFilter, isLive, isPast, isNext, isAdmin, onTimeEdit }) {
+  const [editing, setEditing] = useState(false);
+  const [editVal, setEditVal] = useState(slot.time);
   const visible = tableFilter === 'all' ? [0, 1, 2] : [tableFilter - 1];
+
+  const startEdit = () => { setEditVal(slot.time); setEditing(true); };
+  const commitEdit = () => {
+    setEditing(false);
+    if (editVal.trim() && editVal.trim() !== slot.time) onTimeEdit(slotIdx, editVal.trim());
+  };
+
   return (
     <div style={{ ...S.timeSlot, ...(isLive ? S.timeSlotLive : {}), ...(isPast ? S.timeSlotPast : {}) }}>
       <div style={S.slotTime}>
         {isLive && <div style={S.slotLiveBadge}>LIVE</div>}
         {isNext && <div style={S.slotNextBadge}>NEXT</div>}
-        <div style={S.slotTimeMain}>{slot.time}</div>
+        {editing ? (
+          <input
+            autoFocus
+            value={editVal}
+            onChange={e => setEditVal(e.target.value)}
+            onBlur={commitEdit}
+            onKeyDown={e => { if (e.key === 'Enter') commitEdit(); if (e.key === 'Escape') setEditing(false); }}
+            style={S.slotTimeInput}
+          />
+        ) : (
+          <div style={S.slotTimeMain} onClick={isAdmin ? startEdit : undefined}
+               title={isAdmin ? 'Click to edit time' : undefined}>
+            {slot.time}
+            {isAdmin && <span style={S.slotTimeEditHint}>✎</span>}
+          </div>
+        )}
         <div style={S.slotTimeDuration}>{slot.duration}</div>
       </div>
       <div style={S.slotMatches}>
@@ -2321,8 +2362,9 @@ function TVDisplay({ data, onExit }) {
     return () => clearInterval(id);
   }, []);
 
-  const live = getLiveSlotInfo();
-  const liveSlot = live.status === 'live' ? SCHEDULE_SLOTS[live.index] : null;
+  const slots = useMemo(() => getEffectiveSlots(data), [data]);
+  const live = getLiveSlotInfo(slots);
+  const liveSlot = live.status === 'live' ? slots[live.index] : null;
   const champion = data.matches.FINAL?.winner ? data.teams[data.matches.FINAL.winner] : null;
   const stats = useMemo(() => computeStats(data), [data]);
 
@@ -2493,7 +2535,8 @@ function TVScheduleDisplay({ data, onExit }) {
     return () => clearInterval(id);
   }, []);
 
-  const live = getLiveSlotInfo();
+  const slots = useMemo(() => getEffectiveSlots(data), [data]);
+  const live = getLiveSlotInfo(slots);
   const stats = useMemo(() => computeStats(data), [data]);
 
   return (
@@ -2517,7 +2560,7 @@ function TVScheduleDisplay({ data, onExit }) {
 
       {/* Schedule slots */}
       <div style={S.tvSchedGrid}>
-        {SCHEDULE_SLOTS.map((slot, idx) => {
+        {slots.map((slot, idx) => {
           const isLive = live.status === 'live' && live.index === idx;
           const isPast = (live.status === 'live' && idx < live.index) || live.status === 'finished';
           return (
@@ -2583,6 +2626,9 @@ function TVScheduleDisplay({ data, onExit }) {
 // PRINT SCHEDULE
 // ═══════════════════════════════════════════════════════════════════════════
 function PrintSchedule({ data, onClose }) {
+  const slots = getEffectiveSlots(data);
+  const piDone = data.matches.L_PI?.winner && data.matches.R_PI?.winner;
+
   return (
     <div style={S.printBackdrop}>
       <div style={S.printContainer}>
@@ -2600,7 +2646,7 @@ function PrintSchedule({ data, onClose }) {
             <th style={S.printTh}>TABLE 3</th>
           </tr></thead>
           <tbody>
-            {SCHEDULE_SLOTS.map((slot, idx) => (
+            {slots.map((slot, idx) => (
               <tr key={idx}>
                 <td style={{ ...S.printTd, ...S.printTimeCell }}>
                   <strong>{slot.time}</strong><br />
@@ -2621,6 +2667,75 @@ function PrintSchedule({ data, onClose }) {
           <p><b>COMPETE · HAVE FUN · DREAM BIG</b></p>
           <p>1 GAME TO 21 · FINALS BEST OF 3 · 3 TABLES</p>
         </div>
+
+        {piDone && <PrintBracket data={data} />}
+      </div>
+    </div>
+  );
+}
+
+function PrintBracket({ data }) {
+  const rounds = [
+    { label: 'R16', ids: ['L_R1_1','L_R1_2','L_R1_3','L_R1_4'] },
+    { label: 'QF',  ids: ['L_QF_1','L_QF_2'] },
+    { label: 'SF',  ids: ['L_SF'] },
+  ];
+  const roundsR = [
+    { label: 'R16', ids: ['R_R1_1','R_R1_2','R_R1_3','R_R1_4'] },
+    { label: 'QF',  ids: ['R_QF_1','R_QF_2'] },
+    { label: 'SF',  ids: ['R_SF'] },
+  ];
+
+  const teamLabel = (teamId) => {
+    if (!teamId) return 'TBD';
+    const t = data.teams[teamId];
+    if (!t) return 'TBD';
+    const p1 = t.playerIds[0] ? data.players.find(p => p.id === t.playerIds[0]) : null;
+    const p2 = t.playerIds[1] ? data.players.find(p => p.id === t.playerIds[1]) : null;
+    return `(${t.seed}) ${p1?.name || '—'} / ${p2?.name || '—'}`;
+  };
+
+  const MatchBox = ({ matchId, isChamp }) => {
+    const m = data.matches[matchId];
+    if (!m) return null;
+    const t1label = teamLabel(m.slots[0]);
+    const t2label = teamLabel(m.slots[1]);
+    const w = m.winner;
+    return (
+      <div style={{ border: isChamp ? '2px solid #D4A54B' : '1px solid #333', borderRadius: 4, marginBottom: 4, overflow: 'hidden', background: isChamp ? '#fdf9f0' : '#fff' }}>
+        <div style={{ padding: '4px 7px', borderBottom: '1px solid #eee', fontWeight: w === m.slots[0] ? 700 : 400, color: w && w !== m.slots[0] ? '#aaa' : '#1a1a1a', fontSize: isChamp ? 13 : 11 }}>
+          {t1label}
+        </div>
+        <div style={{ padding: '4px 7px', fontWeight: w === m.slots[1] ? 700 : 400, color: w && w !== m.slots[1] ? '#aaa' : '#1a1a1a', fontSize: isChamp ? 13 : 11 }}>
+          {t2label}
+        </div>
+      </div>
+    );
+  };
+
+  const RoundCol = ({ label, ids }) => (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 8, minWidth: 180 }}>
+      <div style={{ fontWeight: 700, fontSize: 10, letterSpacing: 1, color: '#D4A54B', textAlign: 'center', marginBottom: 4 }}>{label}</div>
+      {ids.map(id => <MatchBox key={id} matchId={id} />)}
+    </div>
+  );
+
+  return (
+    <div style={{ marginTop: 40, pageBreakBefore: 'always' }}>
+      <h2 style={{ textAlign: 'center', fontSize: 18, fontWeight: 700, letterSpacing: 2, marginBottom: 6 }}>TOURNAMENT BRACKET</h2>
+      <p style={{ textAlign: 'center', fontSize: 11, color: '#666', marginBottom: 20 }}>Winners shown in bold</p>
+      <div style={{ display: 'flex', gap: 16, alignItems: 'center', justifyContent: 'center', flexWrap: 'wrap' }}>
+        {/* Left side */}
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4, fontSize: 10, fontWeight: 700, color: '#666', letterSpacing: 1 }}>LEFT</div>
+        {rounds.map(r => <RoundCol key={r.label + 'L'} label={r.label} ids={r.ids} />)}
+        {/* Championship */}
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', minWidth: 200 }}>
+          <div style={{ fontWeight: 700, fontSize: 10, letterSpacing: 1, color: '#D4A54B', textAlign: 'center', marginBottom: 4 }}>CHAMPIONSHIP</div>
+          <MatchBox matchId="FINAL" isChamp />
+        </div>
+        {/* Right side */}
+        {[...roundsR].reverse().map(r => <RoundCol key={r.label + 'R'} label={r.label} ids={r.ids} />)}
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4, fontSize: 10, fontWeight: 700, color: '#666', letterSpacing: 1 }}>RIGHT</div>
       </div>
     </div>
   );
@@ -3069,6 +3184,12 @@ const S = {
     color: T.gold, textAlign: 'center', lineHeight: 1.2, whiteSpace: 'nowrap',
   },
   slotTimeDuration: { fontFamily: "'Barlow Condensed', sans-serif", fontSize: 10, color: 'rgba(245,238,220,0.5)' },
+  slotTimeEditHint: { marginLeft: 4, fontSize: 9, opacity: 0.5, cursor: 'pointer' },
+  slotTimeInput: {
+    fontFamily: "'Oswald', sans-serif", fontSize: 11, fontWeight: 700, letterSpacing: 0.5,
+    color: T.gold, background: 'rgba(212,165,75,0.12)', border: `1px solid ${T.gold}`,
+    borderRadius: 4, padding: '2px 4px', width: 90, textAlign: 'center', outline: 'none',
+  },
   slotMatches: { flex: 1, display: 'flex', background: T.bgCard },
   slotMatch: { flex: 1, padding: 10, display: 'flex', flexDirection: 'column', gap: 4, alignItems: 'center', justifyContent: 'center' },
   slotMatchEmpty: { background: 'rgba(255,255,255,0.03)' },
