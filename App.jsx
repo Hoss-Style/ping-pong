@@ -233,6 +233,17 @@ function parseSlotTime(timeStr) {
 
 function getLiveSlotInfo() {
   const now = new Date();
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const eventDay = new Date(2026, 4, 14); // May 14 2026
+
+  if (today < eventDay) {
+    const daysUntil = Math.round((eventDay - today) / 86400000);
+    return { status: 'upcoming', index: 0, daysUntil };
+  }
+  if (today > eventDay) {
+    return { status: 'finished', index: SCHEDULE_SLOTS.length - 1 };
+  }
+  // Event day — use clock
   const slots = SCHEDULE_SLOTS.map(s => parseSlotTime(s.time));
   for (let i = 0; i < slots.length; i++) {
     if (now >= slots[i].start && now <= slots[i].end) return { status: 'live', index: i };
@@ -1063,6 +1074,8 @@ function PlayerSlot({ player, num, onTap, onRemove, editMode, isChamp, locked })
 // ═══════════════════════════════════════════════════════════════════════════
 function DesktopBracketView({ data, onTeamTap, onScoreEdit, onShareMatch, locked }) {
   const MH = 82, MW = 172, HG = 30, VG = 22, PAD = 44;
+  const containerRef = useRef(null);
+  const [scale, setScale] = useState(1);
   const UNIT = MH + VG;
 
   // Vertical centers for each match relative to bracket top
@@ -1088,6 +1101,17 @@ function DesktopBracketView({ data, onTeamTap, onScoreEdit, onShareMatch, locked
   C.rr1X = C.rqfX + MW + HG;
   C.rpiX = C.rr1X + MW + HG;
   const totalW = C.rpiX + MW;
+
+  useEffect(() => {
+    const compute = () => {
+      if (!containerRef.current) return;
+      const available = containerRef.current.offsetWidth - 48;
+      setScale(Math.min(1, available / totalW));
+    };
+    compute();
+    window.addEventListener('resize', compute);
+    return () => window.removeEventListener('resize', compute);
+  }, [totalW]);
 
   const Y = c => PAD + c;
   const lp = { stroke: T.gold, strokeWidth: 1.5, opacity: 0.35, strokeLinecap: 'round' };
@@ -1124,12 +1148,12 @@ function DesktopBracketView({ data, onTeamTap, onScoreEdit, onShareMatch, locked
     <line key="r-pi" x1={C.rr1X+MW} y1={Y(rc[0])} x2={C.rpiX} y2={Y(rc[0])} {...lp} />,
   ];
 
-  const mc = (matchId, x, top) => (
+  const mc = (matchId, x, top, isFinalCard = false) => (
     <div key={matchId} style={{ position: 'absolute', left: x, top: PAD + top }}>
       <DesktopMatchCard
         matchId={matchId} data={data}
         onTeamTap={onTeamTap} onScoreEdit={onScoreEdit} onShareMatch={onShareMatch}
-        locked={locked} width={MW}
+        locked={locked} width={MW} isFinalCard={isFinalCard}
       />
     </div>
   );
@@ -1140,34 +1164,47 @@ function DesktopBracketView({ data, onTeamTap, onScoreEdit, onShareMatch, locked
     [C.rqfX, 'QUARTERFINALS'], [C.rr1X, 'ROUND OF 16'], [C.rpiX, 'PLAY-IN'],
   ];
 
+  const innerH = 28 + totalH; // labels (22 + 6 margin) + bracket
+
   return (
-    <div style={S.desktopWrap}>
-      <div style={{ position: 'relative', width: totalW, height: 22, marginBottom: 6 }}>
-        {LABELS.map(([x, label]) => (
-          <div key={label + x} style={{ ...S.dmcColLabel, left: x, width: MW }}>{label}</div>
-        ))}
+    <div ref={containerRef} style={S.desktopWrap}>
+      <div style={{
+        transformOrigin: 'top left',
+        transform: `scale(${scale})`,
+        width: totalW,
+        position: 'relative',
+      }}>
+        {/* Column labels */}
+        <div style={{ position: 'relative', width: totalW, height: 22, marginBottom: 6 }}>
+          {LABELS.map(([x, label]) => (
+            <div key={label + x} style={{ ...S.dmcColLabel, left: x, width: MW }}>{label}</div>
+          ))}
+        </div>
+        {/* Bracket */}
+        <div style={{ position: 'relative', width: totalW, height: totalH }}>
+          <svg style={{ position: 'absolute', inset: 0, width: totalW, height: totalH, pointerEvents: 'none' }}>
+            {svgLines}
+          </svg>
+          {mc('L_PI',   C.piX,  rt[0])}
+          {mc('L_R1_1', C.r1X,  rt[0])} {mc('L_R1_2', C.r1X, rt[1])}
+          {mc('L_R1_3', C.r1X,  rt[2])} {mc('L_R1_4', C.r1X, rt[3])}
+          {mc('L_QF_1', C.qfX,  qt[0])} {mc('L_QF_2', C.qfX, qt[1])}
+          {mc('L_SF',   C.sfX,  st)}
+          {mc('FINAL',  C.finX, st, true)}
+          {mc('R_SF',   C.rsfX, st)}
+          {mc('R_QF_1', C.rqfX, qt[0])} {mc('R_QF_2', C.rqfX, qt[1])}
+          {mc('R_R1_1', C.rr1X, rt[0])} {mc('R_R1_2', C.rr1X, rt[1])}
+          {mc('R_R1_3', C.rr1X, rt[2])} {mc('R_R1_4', C.rr1X, rt[3])}
+          {mc('R_PI',   C.rpiX, rt[0])}
+        </div>
       </div>
-      <div style={{ position: 'relative', width: totalW, height: totalH }}>
-        <svg style={{ position: 'absolute', inset: 0, width: totalW, height: totalH, pointerEvents: 'none' }}>
-          {svgLines}
-        </svg>
-        {mc('L_PI',   C.piX,  rt[0])}
-        {mc('L_R1_1', C.r1X,  rt[0])} {mc('L_R1_2', C.r1X, rt[1])}
-        {mc('L_R1_3', C.r1X,  rt[2])} {mc('L_R1_4', C.r1X, rt[3])}
-        {mc('L_QF_1', C.qfX,  qt[0])} {mc('L_QF_2', C.qfX, qt[1])}
-        {mc('L_SF',   C.sfX,  st)}
-        {mc('FINAL',  C.finX, st)}
-        {mc('R_SF',   C.rsfX, st)}
-        {mc('R_QF_1', C.rqfX, qt[0])} {mc('R_QF_2', C.rqfX, qt[1])}
-        {mc('R_R1_1', C.rr1X, rt[0])} {mc('R_R1_2', C.rr1X, rt[1])}
-        {mc('R_R1_3', C.rr1X, rt[2])} {mc('R_R1_4', C.rr1X, rt[3])}
-        {mc('R_PI',   C.rpiX, rt[0])}
-      </div>
+      {/* Spacer so parent grows to scaled height */}
+      <div style={{ height: innerH * scale, flexShrink: 0 }} />
     </div>
   );
 }
 
-function DesktopMatchCard({ matchId, data, onTeamTap, onScoreEdit, onShareMatch, locked, width }) {
+function DesktopMatchCard({ matchId, data, onTeamTap, onScoreEdit, onShareMatch, locked, width, isFinalCard }) {
   const match = data.matches[matchId];
   if (!match) return null;
   const isFinal = matchId === 'FINAL';
@@ -1206,10 +1243,10 @@ function DesktopMatchCard({ matchId, data, onTeamTap, onScoreEdit, onShareMatch,
           {team.seed}{team.pi && <span style={S.dmcPiTag}>PI</span>}
         </span>
         <div style={S.dmcPlayerNames}>
-          <div style={{ ...S.dmcPName, ...(champWin ? { color: T.bgDeep } : {}) }}>
+          <div style={{ ...S.dmcPName, ...(champWin ? { color: T.bgDeep } : {}), ...(isFinalCard ? { fontSize: 12, fontWeight: 700 } : {}) }}>
             {p1 ? p1.name : '…'}
           </div>
-          <div style={{ ...S.dmcPName, ...(champWin ? { color: T.bgDeep } : {}) }}>
+          <div style={{ ...S.dmcPName, ...(champWin ? { color: T.bgDeep } : {}), ...(isFinalCard ? { fontSize: 12, fontWeight: 700 } : {}) }}>
             {p2 ? p2.name : '…'}
           </div>
         </div>
@@ -1226,10 +1263,16 @@ function DesktopMatchCard({ matchId, data, onTeamTap, onScoreEdit, onShareMatch,
   const shortLabel = matchLabel(matchId)
     .replace('LEFT · ', 'L · ').replace('RIGHT · ', 'R · ');
 
+  const finalCardStyle = isFinalCard ? {
+    border: `2px solid ${T.gold}`,
+    boxShadow: `0 0 24px rgba(212,165,75,0.45), inset 0 0 16px rgba(212,165,75,0.06)`,
+    borderRadius: 10,
+  } : {};
+
   return (
-    <div style={{ ...S.dmc, width }}>
-      <div style={S.dmcHeader}>
-        <span style={S.dmcLabel}>{shortLabel}</span>
+    <div style={{ ...S.dmc, width, ...finalCardStyle }}>
+      <div style={{ ...S.dmcHeader, ...(isFinalCard ? { background: T.goldDark, borderBottom: `1px solid ${T.gold}` } : {}) }}>
+        <span style={{ ...S.dmcLabel, ...(isFinalCard ? { color: T.goldGlow, fontSize: 11, letterSpacing: 1.5 } : {}) }}>{shortLabel}</span>
         <div style={S.dmcBtns}>
           {!locked && onScoreEdit && (
             <button style={S.dmcBtn}
@@ -1359,7 +1402,13 @@ function ScheduleView({ data, tableFilter, setTableFilter }) {
           <span style={S.liveTime}>{SCHEDULE_SLOTS[live.index].time}</span>
         </div>
       )}
-      {live.status === 'upcoming' && live.minutesUntil <= 30 && (
+      {live.status === 'upcoming' && live.daysUntil > 0 && (
+        <div style={S.upNextBanner}>
+          <span style={S.upNextLabel}>TOURNAMENT IN</span>
+          <span style={S.upNextTime}>{live.daysUntil} {live.daysUntil === 1 ? 'DAY' : 'DAYS'}</span>
+        </div>
+      )}
+      {live.status === 'upcoming' && live.minutesUntil != null && live.minutesUntil <= 30 && (
         <div style={S.upNextBanner}>
           <span style={S.upNextLabel}>STARTS IN</span>
           <span style={S.upNextTime}>{live.minutesUntil} MIN</span>
@@ -1394,7 +1443,9 @@ function TimeSlot({ slot, data, tableFilter, isLive, isPast, isNext }) {
       <div style={S.slotTime}>
         {isLive && <div style={S.slotLiveBadge}>LIVE</div>}
         {isNext && <div style={S.slotNextBadge}>NEXT</div>}
-        <div style={S.slotTimeMain}>{slot.time}</div>
+        {slot.time.split('–').map((t, i) => (
+          <div key={i} style={S.slotTimeMain}>{t.trim()}</div>
+        ))}
         <div style={S.slotTimeDuration}>{slot.duration}</div>
       </div>
       <div style={S.slotMatches}>
@@ -3254,7 +3305,7 @@ const S = {
   printFooter: { textAlign: 'center', paddingTop: 20, borderTop: '2px solid #000', fontSize: 13, fontWeight: 700 },
 
   // Desktop bracket
-  desktopWrap:    { overflowX: 'auto', overflowY: 'auto', flex: 1, padding: '20px 32px 40px', display: 'flex', flexDirection: 'column' },
+  desktopWrap:    { overflow: 'hidden', flex: 1, padding: '20px 24px 32px', display: 'flex', flexDirection: 'column' },
   dmcColLabel:    { position: 'absolute', textAlign: 'center', color: T.gold, fontSize: 9, fontFamily: 'Oswald, sans-serif', letterSpacing: 1.5, opacity: 0.6, pointerEvents: 'none' },
   dmc:            { background: T.bgCard, border: `1px solid ${T.rim}`, borderRadius: 7, overflow: 'hidden', display: 'flex', flexDirection: 'column' },
   dmcHeader:      { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '3px 6px', background: T.bgSoft, borderBottom: `1px solid ${T.rim}`, flexShrink: 0 },
