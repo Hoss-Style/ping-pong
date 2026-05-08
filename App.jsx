@@ -304,6 +304,16 @@ function matchScoreString(match) {
   return match.scores.team1.map((g, i) => `${g[0]}-${match.scores.team2[i][1]}`).join(', ');
 }
 
+function useIsDesktop() {
+  const [v, setV] = useState(() => typeof window !== 'undefined' && window.innerWidth >= 960);
+  useEffect(() => {
+    const fn = () => setV(window.innerWidth >= 960);
+    window.addEventListener('resize', fn);
+    return () => window.removeEventListener('resize', fn);
+  }, []);
+  return v;
+}
+
 // ═══════════════════════════════════════════════════════════════════════════
 // ROOT APP
 // ═══════════════════════════════════════════════════════════════════════════
@@ -324,6 +334,7 @@ export default function App() {
   const [printMode, setPrintMode] = useState(false);
   const [loaded, setLoaded] = useState(false);
   const [toast, setToast] = useState(null);
+  const isDesktop = useIsDesktop();
   const [session, setSession]             = useState(null);
   const [showLogin, setShowLogin]         = useState(false);
   const [loginEmail, setLoginEmail]       = useState('');
@@ -630,7 +641,7 @@ export default function App() {
   return (
     <div style={S.appShell}>
       <style>{globalCSS}</style>
-      <div style={S.app}>
+      <div style={{ ...S.app, maxWidth: isDesktop ? 'none' : '480px', overflowX: isDesktop ? 'visible' : 'hidden' }}>
 
         {/* HEADER */}
         <header style={S.header}>
@@ -697,7 +708,15 @@ export default function App() {
 
         {/* CONTENT */}
         <main style={S.content}>
-          {tab === 'bracket' && (
+          {tab === 'bracket' && (isDesktop ? (
+            <DesktopBracketView
+              data={data}
+              onTeamTap={isAdmin ? advanceWinner : undefined}
+              onScoreEdit={isAdmin ? setScoreEditor : undefined}
+              onShareMatch={setShareCard}
+              locked={data.locked || !isAdmin}
+            />
+          ) : (
             <BracketView
               data={data}
               activeRound={activeRound}
@@ -712,7 +731,7 @@ export default function App() {
               onSeedEdit={isAdmin ? setSeedEditor : undefined}
               locked={data.locked || !isAdmin}
             />
-          )}
+          ))}
           {tab === 'schedule' && (
             <ScheduleView data={data} tableFilter={tableFilter} setTableFilter={setTableFilter} />
           )}
@@ -1035,6 +1054,198 @@ function PlayerSlot({ player, num, onTap, onRemove, editMode, isChamp, locked })
         {player.name}
       </span>
       {editMode && !locked && <button style={S.removeBtn} onClick={onRemove}>×</button>}
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// DESKTOP BRACKET — March Madness style for screens ≥ 960px
+// ═══════════════════════════════════════════════════════════════════════════
+function DesktopBracketView({ data, onTeamTap, onScoreEdit, onShareMatch, locked }) {
+  const MH = 82, MW = 172, HG = 30, VG = 22, PAD = 44;
+  const UNIT = MH + VG;
+
+  // Vertical centers for each match relative to bracket top
+  const rc = [0,1,2,3].map(i => i * UNIT + MH / 2);
+  const qc = [[0,1],[2,3]].map(([a,b]) => (rc[a] + rc[b]) / 2);
+  const sc = (qc[0] + qc[1]) / 2;
+
+  // Top positions
+  const rt = rc.map(c => c - MH / 2);
+  const qt = qc.map(c => c - MH / 2);
+  const st = sc - MH / 2;
+  const totalH = rt[3] + MH + PAD * 2;
+
+  // Column X positions
+  const C = {};
+  C.piX  = 0;
+  C.r1X  = MW + HG;
+  C.qfX  = C.r1X  + MW + HG;
+  C.sfX  = C.qfX  + MW + HG;
+  C.finX = C.sfX  + MW + HG;
+  C.rsfX = C.finX + MW + HG;
+  C.rqfX = C.rsfX + MW + HG;
+  C.rr1X = C.rqfX + MW + HG;
+  C.rpiX = C.rr1X + MW + HG;
+  const totalW = C.rpiX + MW;
+
+  const Y = c => PAD + c;
+  const lp = { stroke: T.gold, strokeWidth: 1.5, opacity: 0.35, strokeLinecap: 'round' };
+
+  // Helper to generate a bracket pair connector
+  const pairLines = (prefix, x1, x2, ya, yb, ymid) => {
+    const xm = x1 + HG / 2;
+    return [
+      <line key={`${prefix}a`} x1={x1} y1={ya}   x2={xm} y2={ya}   {...lp} />,
+      <line key={`${prefix}b`} x1={x1} y1={yb}   x2={xm} y2={yb}   {...lp} />,
+      <line key={`${prefix}v`} x1={xm} y1={ya}   x2={xm} y2={yb}   {...lp} />,
+      <line key={`${prefix}m`} x1={xm} y1={ymid} x2={x2} y2={ymid} {...lp} />,
+    ];
+  };
+
+  const svgLines = [
+    // Left PI → R1_1
+    <line key="l-pi" x1={C.piX+MW} y1={Y(rc[0])} x2={C.r1X}    y2={Y(rc[0])} {...lp} />,
+    // Left R1 → QF
+    ...pairLines('l-r1a', C.r1X+MW,    C.qfX,      Y(rc[0]), Y(rc[1]), Y(qc[0])),
+    ...pairLines('l-r1b', C.r1X+MW,    C.qfX,      Y(rc[2]), Y(rc[3]), Y(qc[1])),
+    // Left QF → SF
+    ...pairLines('l-qf',  C.qfX+MW,    C.sfX,      Y(qc[0]), Y(qc[1]), Y(sc)),
+    // Left SF → Final
+    <line key="l-sf" x1={C.sfX+MW}  y1={Y(sc)}  x2={C.finX}  y2={Y(sc)}  {...lp} />,
+    // Right SF → Final
+    <line key="r-sf" x1={C.finX+MW} y1={Y(sc)}  x2={C.rsfX}  y2={Y(sc)}  {...lp} />,
+    // Right QF → SF (connectors on left of QF, toward rsfX right edge)
+    ...pairLines('r-qf',  C.rqfX,      C.rsfX+MW,  Y(qc[0]), Y(qc[1]), Y(sc)),
+    // Right R1 → QF (connectors on left of R1, toward rqfX right edge)
+    ...pairLines('r-r1a', C.rr1X,      C.rqfX+MW,  Y(rc[0]), Y(rc[1]), Y(qc[0])),
+    ...pairLines('r-r1b', C.rr1X,      C.rqfX+MW,  Y(rc[2]), Y(rc[3]), Y(qc[1])),
+    // Right PI → R1_1
+    <line key="r-pi" x1={C.rr1X+MW} y1={Y(rc[0])} x2={C.rpiX} y2={Y(rc[0])} {...lp} />,
+  ];
+
+  const mc = (matchId, x, top) => (
+    <div key={matchId} style={{ position: 'absolute', left: x, top: PAD + top }}>
+      <DesktopMatchCard
+        matchId={matchId} data={data}
+        onTeamTap={onTeamTap} onScoreEdit={onScoreEdit} onShareMatch={onShareMatch}
+        locked={locked} width={MW}
+      />
+    </div>
+  );
+
+  const LABELS = [
+    [C.piX,  'PLAY-IN'],   [C.r1X,  'ROUND OF 16'], [C.qfX,  'QUARTERFINALS'],
+    [C.sfX,  'SEMIFINALS'],[C.finX, 'CHAMPIONSHIP'], [C.rsfX, 'SEMIFINALS'],
+    [C.rqfX, 'QUARTERFINALS'], [C.rr1X, 'ROUND OF 16'], [C.rpiX, 'PLAY-IN'],
+  ];
+
+  return (
+    <div style={S.desktopWrap}>
+      <div style={{ position: 'relative', width: totalW, height: 22, marginBottom: 6 }}>
+        {LABELS.map(([x, label]) => (
+          <div key={label + x} style={{ ...S.dmcColLabel, left: x, width: MW }}>{label}</div>
+        ))}
+      </div>
+      <div style={{ position: 'relative', width: totalW, height: totalH }}>
+        <svg style={{ position: 'absolute', inset: 0, width: totalW, height: totalH, pointerEvents: 'none' }}>
+          {svgLines}
+        </svg>
+        {mc('L_PI',   C.piX,  rt[0])}
+        {mc('L_R1_1', C.r1X,  rt[0])} {mc('L_R1_2', C.r1X, rt[1])}
+        {mc('L_R1_3', C.r1X,  rt[2])} {mc('L_R1_4', C.r1X, rt[3])}
+        {mc('L_QF_1', C.qfX,  qt[0])} {mc('L_QF_2', C.qfX, qt[1])}
+        {mc('L_SF',   C.sfX,  st)}
+        {mc('FINAL',  C.finX, st)}
+        {mc('R_SF',   C.rsfX, st)}
+        {mc('R_QF_1', C.rqfX, qt[0])} {mc('R_QF_2', C.rqfX, qt[1])}
+        {mc('R_R1_1', C.rr1X, rt[0])} {mc('R_R1_2', C.rr1X, rt[1])}
+        {mc('R_R1_3', C.rr1X, rt[2])} {mc('R_R1_4', C.rr1X, rt[3])}
+        {mc('R_PI',   C.rpiX, rt[0])}
+      </div>
+    </div>
+  );
+}
+
+function DesktopMatchCard({ matchId, data, onTeamTap, onScoreEdit, onShareMatch, locked, width }) {
+  const match = data.matches[matchId];
+  if (!match) return null;
+  const isFinal = matchId === 'FINAL';
+
+  const renderSlot = (slotIdx) => {
+    const teamId = match.slots[slotIdx];
+    const isWinner = match.winner === teamId && !!teamId;
+    const isLoser  = !!match.winner && match.winner !== teamId && !!teamId;
+
+    if (!teamId) {
+      const isPI = (matchId === 'L_R1_1' || matchId === 'R_R1_1') && slotIdx === 1;
+      return (
+        <div style={S.dmcSlotEmpty}>
+          <span style={S.dmcSeedEmpty}>–</span>
+          <span style={S.dmcNameTbd}>{isPI ? 'PI WINNER' : 'TBD'}</span>
+        </div>
+      );
+    }
+
+    const team = data.teams[teamId];
+    const p1 = team.playerIds[0] ? data.players.find(p => p.id === team.playerIds[0]) : null;
+    const p2 = team.playerIds[1] ? data.players.find(p => p.id === team.playerIds[1]) : null;
+    const champWin = isFinal && isWinner;
+
+    return (
+      <div
+        style={{
+          ...S.dmcSlot,
+          ...(isWinner ? (champWin ? S.dmcSlotChamp : S.dmcSlotWin) : {}),
+          ...(isLoser  ? S.dmcSlotLose : {}),
+          cursor: locked ? 'default' : 'pointer',
+        }}
+        onClick={() => !locked && onTeamTap && onTeamTap(matchId, teamId)}
+      >
+        <span style={{ ...S.dmcSeed, ...(champWin ? { color: T.bgDeep } : {}) }}>
+          {team.seed}{team.pi && <span style={S.dmcPiTag}>PI</span>}
+        </span>
+        <div style={S.dmcPlayerNames}>
+          <div style={{ ...S.dmcPName, ...(champWin ? { color: T.bgDeep } : {}) }}>
+            {p1 ? p1.name : '…'}
+          </div>
+          <div style={{ ...S.dmcPName, ...(champWin ? { color: T.bgDeep } : {}) }}>
+            {p2 ? p2.name : '…'}
+          </div>
+        </div>
+        {isWinner && (
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none"
+               stroke={champWin ? T.bgDeep : T.gold} strokeWidth="3" style={{ flexShrink: 0 }}>
+            <path d="M5 12l5 5L20 7" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
+        )}
+      </div>
+    );
+  };
+
+  const shortLabel = matchLabel(matchId)
+    .replace('LEFT · ', 'L · ').replace('RIGHT · ', 'R · ');
+
+  return (
+    <div style={{ ...S.dmc, width }}>
+      <div style={S.dmcHeader}>
+        <span style={S.dmcLabel}>{shortLabel}</span>
+        <div style={S.dmcBtns}>
+          {!locked && onScoreEdit && (
+            <button style={S.dmcBtn}
+              onClick={e => { e.stopPropagation(); onScoreEdit({ matchId }); }}
+              title="Enter scores">📊</button>
+          )}
+          {match.winner && onShareMatch && (
+            <button style={S.dmcBtn}
+              onClick={e => { e.stopPropagation(); onShareMatch({ matchId }); }}
+              title="Share">📤</button>
+          )}
+        </div>
+      </div>
+      {renderSlot(0)}
+      <div style={S.dmcDivider} />
+      {renderSlot(1)}
     </div>
   );
 }
@@ -3041,6 +3252,27 @@ const S = {
   printMatch: { fontSize: 11, lineHeight: 1.5 },
   printVs: { textAlign: 'center', fontWeight: 700, color: '#D4A54B', margin: '4px 0' },
   printFooter: { textAlign: 'center', paddingTop: 20, borderTop: '2px solid #000', fontSize: 13, fontWeight: 700 },
+
+  // Desktop bracket
+  desktopWrap:    { overflowX: 'auto', overflowY: 'auto', flex: 1, padding: '20px 32px 40px', display: 'flex', flexDirection: 'column' },
+  dmcColLabel:    { position: 'absolute', textAlign: 'center', color: T.gold, fontSize: 9, fontFamily: 'Oswald, sans-serif', letterSpacing: 1.5, opacity: 0.6, pointerEvents: 'none' },
+  dmc:            { background: T.bgCard, border: `1px solid ${T.rim}`, borderRadius: 7, overflow: 'hidden', display: 'flex', flexDirection: 'column' },
+  dmcHeader:      { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '3px 6px', background: T.bgSoft, borderBottom: `1px solid ${T.rim}`, flexShrink: 0 },
+  dmcLabel:       { color: T.ivoryDim, fontSize: 9, fontFamily: 'Oswald, sans-serif', letterSpacing: 0.8, opacity: 0.75 },
+  dmcBtns:        { display: 'flex', gap: 2 },
+  dmcBtn:         { background: 'transparent', border: 'none', cursor: 'pointer', fontSize: 11, padding: '0 2px', opacity: 0.7, lineHeight: 1 },
+  dmcSlot:        { display: 'flex', alignItems: 'center', gap: 5, padding: '5px 6px', flex: 1, minHeight: 0 },
+  dmcSlotWin:     { background: T.gold },
+  dmcSlotChamp:   { background: T.goldGlow },
+  dmcSlotLose:    { opacity: 0.4 },
+  dmcSlotEmpty:   { display: 'flex', alignItems: 'center', gap: 5, padding: '5px 6px', flex: 1, opacity: 0.3 },
+  dmcDivider:     { height: 1, background: T.rim, flexShrink: 0 },
+  dmcSeed:        { color: T.gold, fontSize: 11, fontWeight: 700, fontFamily: 'Oswald, sans-serif', minWidth: 14, textAlign: 'center', flexShrink: 0 },
+  dmcSeedEmpty:   { color: T.ivoryDim, fontSize: 11, fontFamily: 'Oswald, sans-serif', minWidth: 14, textAlign: 'center', flexShrink: 0 },
+  dmcPiTag:       { fontSize: 7, marginLeft: 1, opacity: 0.7 },
+  dmcPlayerNames: { display: 'flex', flexDirection: 'column', flex: 1, minWidth: 0, gap: 1 },
+  dmcPName:       { color: T.ivory, fontSize: 10, fontFamily: 'Barlow Condensed, sans-serif', fontWeight: 600, lineHeight: 1.2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
+  dmcNameTbd:     { color: T.ivoryDim, fontSize: 10, fontFamily: 'Barlow Condensed, sans-serif' },
 
   // Auth
   loginBtn:     { background: 'transparent', border: 'none', color: T.bgSoft, padding: '4px 8px', borderRadius: 6, cursor: 'pointer', fontSize: 11, fontFamily: 'Oswald, sans-serif', letterSpacing: 1, opacity: 0.5 },
