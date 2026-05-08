@@ -212,6 +212,50 @@ function getEffectiveSlots(data) {
   });
 }
 
+function parseDurationMin(str) {
+  return parseInt(str) || 12;
+}
+
+function fmtTime(date) {
+  return date.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', hour12: true })
+    .replace(':00', '').replace(' AM', '').replace(' PM', pm => pm);
+}
+
+function getProjectedSlots(data) {
+  const base = getEffectiveSlots(data);
+  const actuals = data?.slotActualStarts || [];
+
+  // Build projected start times, chaining from actual starts
+  const projStart = base.map((_, i) => {
+    if (actuals[i]) return new Date(actuals[i]);
+    return null;
+  });
+
+  // Forward-fill projections from each actual start
+  for (let i = 1; i < base.length; i++) {
+    if (!projStart[i] && projStart[i - 1]) {
+      const dur = parseDurationMin(base[i - 1].duration);
+      projStart[i] = new Date(projStart[i - 1].getTime() + dur * 60000);
+    }
+  }
+
+  return base.map((slot, i) => {
+    const actualTs = actuals[i] ? new Date(actuals[i]) : null;
+    const proj = projStart[i];
+    if (!proj) return { ...slot, projected: false, actualTs: null };
+
+    const dur = parseDurationMin(slot.duration);
+    const endDate = new Date(proj.getTime() + dur * 60000);
+    const timeStr = `${fmtTime(proj)} – ${fmtTime(endDate)}`;
+    return {
+      ...slot,
+      time: timeStr,
+      projected: !actualTs,   // true = estimated, false = confirmed actual
+      actualTs,
+    };
+  });
+}
+
 function matchLabel(matchId) {
   if (matchId === 'FINAL') return 'CHAMPIONSHIP';
   const side = matchId.startsWith('L') ? 'LEFT' : matchId.startsWith('R') ? 'RIGHT' : '';
@@ -767,6 +811,12 @@ export default function App() {
                 const next = cloneData(data);
                 if (!next.scheduleTimes) next.scheduleTimes = Array(SCHEDULE_SLOTS.length).fill(null);
                 next.scheduleTimes[idx] = newTime;
+                setData(next);
+              }}
+              onSlotStart={(idx) => {
+                const next = cloneData(data);
+                if (!next.slotActualStarts) next.slotActualStarts = [];
+                next.slotActualStarts[idx] = new Date().toISOString();
                 setData(next);
               }}
             />
@@ -1635,13 +1685,13 @@ function SeedEditor({ data, side, currentSeed, onClose, onReassign }) {
 // ═══════════════════════════════════════════════════════════════════════════
 // SCHEDULE VIEW
 // ═══════════════════════════════════════════════════════════════════════════
-function ScheduleView({ data, tableFilter, setTableFilter, isAdmin, onTimeEdit }) {
+function ScheduleView({ data, tableFilter, setTableFilter, isAdmin, onTimeEdit, onSlotStart }) {
   const [, setTick] = useState(0);
   useEffect(() => {
     const id = setInterval(() => setTick(t => t + 1), 30000);
     return () => clearInterval(id);
   }, []);
-  const slots = getEffectiveSlots(data);
+  const slots = getProjectedSlots(data);
   const live = getLiveSlotInfo(slots);
 
   return (
@@ -1688,13 +1738,18 @@ function ScheduleView({ data, tableFilter, setTableFilter, isAdmin, onTimeEdit }
       )}
 
       <div>
-        {slots.map((slot, idx) => (
-          <TimeSlot key={idx} slot={slot} slotIdx={idx} data={data} tableFilter={tableFilter}
-            isLive={live.status === 'live' && live.index === idx}
-            isPast={(live.status === 'live' && idx < live.index) || live.status === 'finished'}
-            isNext={live.status === 'live' && live.index + 1 === idx}
-            isAdmin={isAdmin} onTimeEdit={onTimeEdit} />
-        ))}
+        {slots.map((slot, idx) => {
+          const isPast = (live.status === 'live' && idx < live.index) || live.status === 'finished';
+          const isLive = live.status === 'live' && live.index === idx;
+          const isNext = live.status === 'live' && live.index + 1 === idx;
+          const canStart = isAdmin && !slot.actualTs && (isLive || isNext || live.status === 'upcoming');
+          return (
+            <TimeSlot key={idx} slot={slot} slotIdx={idx} data={data} tableFilter={tableFilter}
+              isLive={isLive} isPast={isPast} isNext={isNext}
+              isAdmin={isAdmin} onTimeEdit={onTimeEdit}
+              canStart={canStart} onStart={() => onSlotStart(idx)} />
+          );
+        })}
       </div>
 
       <div style={S.scheduleFooter}>
@@ -1706,7 +1761,7 @@ function ScheduleView({ data, tableFilter, setTableFilter, isAdmin, onTimeEdit }
   );
 }
 
-function TimeSlot({ slot, slotIdx, data, tableFilter, isLive, isPast, isNext, isAdmin, onTimeEdit }) {
+function TimeSlot({ slot, slotIdx, data, tableFilter, isLive, isPast, isNext, isAdmin, onTimeEdit, canStart, onStart }) {
   const [editing, setEditing] = useState(false);
   const [editVal, setEditVal] = useState(slot.time);
   const visible = tableFilter === 'all' ? [0, 1, 2] : [tableFilter - 1];
@@ -1723,20 +1778,25 @@ function TimeSlot({ slot, slotIdx, data, tableFilter, isLive, isPast, isNext, is
         {isLive && <div style={S.slotLiveBadge}>LIVE</div>}
         {isNext && <div style={S.slotNextBadge}>NEXT</div>}
         {editing ? (
-          <input
-            autoFocus
-            value={editVal}
-            onChange={e => setEditVal(e.target.value)}
+          <input autoFocus value={editVal} onChange={e => setEditVal(e.target.value)}
             onBlur={commitEdit}
             onKeyDown={e => { if (e.key === 'Enter') commitEdit(); if (e.key === 'Escape') setEditing(false); }}
-            style={S.slotTimeInput}
-          />
+            style={S.slotTimeInput} />
         ) : (
-          <div style={S.slotTimeMain} onClick={isAdmin ? startEdit : undefined}
-               title={isAdmin ? 'Click to edit time' : undefined}>
+          <div style={S.slotTimeMain} onClick={isAdmin && !slot.actualTs ? startEdit : undefined}
+               title={isAdmin && !slot.actualTs ? 'Click to edit time' : undefined}>
             {slot.time}
-            {isAdmin && <span style={S.slotTimeEditHint}>✎</span>}
+            {slot.projected && <span style={S.slotEstBadge}>EST</span>}
+            {isAdmin && !slot.actualTs && <span style={S.slotTimeEditHint}>✎</span>}
           </div>
+        )}
+        {slot.actualTs && (
+          <div style={S.slotActualTime}>
+            STARTED {slot.actualTs.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', hour12: true })}
+          </div>
+        )}
+        {canStart && (
+          <button style={S.slotStartBtn} onClick={onStart}>▶ START</button>
         )}
         <div style={S.slotTimeDuration}>{slot.duration}</div>
       </div>
@@ -1778,18 +1838,20 @@ function SlotMatch({ matchId, tableNum, data, isLast }) {
       {complete ? (
         <>
           <div style={{ ...S.matchTeam, ...(match.winner === t1.id ? S.matchTeamWinner : {}) }}>
-            <div style={S.matchTeamSeed}>{t1.side}{t1.seed}</div>
+            <div style={S.matchTeamSeed}>{t1.seed}</div>
             <div style={S.matchTeamNames}>
-              <div style={S.playerSmall}>{p1a.name}</div>
-              <div style={S.playerSmall}>{p1b.name}</div>
+              {t1.name
+                ? <div style={S.matchTeamNameBold}>{t1.name}</div>
+                : <><div style={S.playerSmall}>{p1a.name}</div><div style={S.playerSmall}>{p1b.name}</div></>}
             </div>
           </div>
           <div style={S.scheduleVs}>VS</div>
           <div style={{ ...S.matchTeam, ...(match.winner === t2.id ? S.matchTeamWinner : {}) }}>
-            <div style={S.matchTeamSeed}>{t2.side}{t2.seed}</div>
+            <div style={S.matchTeamSeed}>{t2.seed}</div>
             <div style={S.matchTeamNames}>
-              <div style={S.playerSmall}>{p2a.name}</div>
-              <div style={S.playerSmall}>{p2b.name}</div>
+              {t2.name
+                ? <div style={S.matchTeamNameBold}>{t2.name}</div>
+                : <><div style={S.playerSmall}>{p2a.name}</div><div style={S.playerSmall}>{p2b.name}</div></>}
             </div>
           </div>
           {match.scores.team1.length > 0 && (
@@ -2603,7 +2665,7 @@ function TVDisplay({ data, onExit }) {
     return () => clearInterval(id);
   }, []);
 
-  const slots = useMemo(() => getEffectiveSlots(data), [data]);
+  const slots = useMemo(() => getProjectedSlots(data), [data]);
   const live = getLiveSlotInfo(slots);
   const liveSlot = live.status === 'live' ? slots[live.index] : null;
   const champion = data.matches.FINAL?.winner ? data.teams[data.matches.FINAL.winner] : null;
@@ -2782,7 +2844,7 @@ function TVScheduleDisplay({ data, onExit }) {
     return () => clearInterval(id);
   }, []);
 
-  const slots = useMemo(() => getEffectiveSlots(data), [data]);
+  const slots = useMemo(() => getProjectedSlots(data), [data]);
   const live = getLiveSlotInfo(slots);
   const stats = useMemo(() => computeStats(data), [data]);
 
@@ -2819,6 +2881,7 @@ function TVScheduleDisplay({ data, onExit }) {
               <div style={S.tvSchedTime}>
                 {isLive && <span style={{ ...S.tvLiveDot, marginRight: 10 }} />}
                 {slot.time}
+                {slot.projected && <span style={S.tvSchedEst}>EST</span>}
               </div>
               <div style={S.tvSchedTables}>
                 {[0, 1, 2].map(i => {
@@ -2839,13 +2902,13 @@ function TVScheduleDisplay({ data, onExit }) {
                         <>
                           <div style={{ ...S.tvSchedTeam, ...(w1 ? S.tvSchedWinner : w2 ? S.tvSchedLoser : {}) }}>
                             <span style={S.tvSchedSeed}>{t1?.seed ?? '—'}</span>
-                            <span style={S.tvSchedNames}>{p1a?.name || '—'} / {p1b?.name || '—'}</span>
+                            <span style={S.tvSchedNames}>{t1 ? getTeamDisplayName(t1, data) : '—'}</span>
                             {w1 && <span style={S.tvSchedCheck}>✓</span>}
                           </div>
                           <div style={S.tvSchedVs}>VS</div>
                           <div style={{ ...S.tvSchedTeam, ...(w2 ? S.tvSchedWinner : w1 ? S.tvSchedLoser : {}) }}>
                             <span style={S.tvSchedSeed}>{t2?.seed ?? '—'}</span>
-                            <span style={S.tvSchedNames}>{p2a?.name || '—'} / {p2b?.name || '—'}</span>
+                            <span style={S.tvSchedNames}>{t2 ? getTeamDisplayName(t2, data) : '—'}</span>
                             {w2 && <span style={S.tvSchedCheck}>✓</span>}
                           </div>
                         </>
@@ -3432,6 +3495,14 @@ const S = {
   },
   slotTimeDuration: { fontFamily: "'Barlow Condensed', sans-serif", fontSize: 10, color: 'rgba(245,238,220,0.5)' },
   slotTimeEditHint: { marginLeft: 4, fontSize: 9, opacity: 0.5, cursor: 'pointer' },
+  slotEstBadge: { marginLeft: 5, fontSize: 8, fontWeight: 700, letterSpacing: 1, color: '#e8a020', background: 'rgba(232,160,32,0.15)', border: '1px solid rgba(232,160,32,0.4)', borderRadius: 3, padding: '1px 4px', verticalAlign: 'middle' },
+  slotActualTime: { fontFamily: "'Barlow Condensed', sans-serif", fontSize: 9, color: T.gold, letterSpacing: 0.5, marginTop: 2 },
+  slotStartBtn: {
+    marginTop: 4, width: '100%', padding: '5px 0',
+    background: 'rgba(212,165,75,0.2)', border: `1px solid ${T.gold}`, borderRadius: 4,
+    color: T.gold, fontFamily: "'Oswald', sans-serif", fontSize: 10, fontWeight: 700, letterSpacing: 1.5,
+    cursor: 'pointer',
+  },
   slotTimeInput: {
     fontFamily: "'Oswald', sans-serif", fontSize: 11, fontWeight: 700, letterSpacing: 0.5,
     color: T.gold, background: 'rgba(212,165,75,0.12)', border: `1px solid ${T.gold}`,
@@ -3448,7 +3519,8 @@ const S = {
     fontFamily: "'Oswald', sans-serif", fontSize: 11, fontWeight: 700, color: T.gold,
     minWidth: 22, textAlign: 'center',
   },
-  matchTeamNames: { display: 'flex', flexDirection: 'column', gap: 1, minWidth: 0 },
+  matchTeamNames: { display: 'flex', flexDirection: 'column', gap: 1, minWidth: 0, flex: 1, overflow: 'hidden' },
+  matchTeamNameBold: { fontFamily: "'Oswald', sans-serif", fontSize: 13, fontWeight: 700, color: T.ivory, letterSpacing: 0.5, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
   playerSmall: {
     fontFamily: "'Oswald', sans-serif", fontSize: 10, fontWeight: 600, color: T.ivory,
     letterSpacing: 0.3, textTransform: 'uppercase',
@@ -4055,6 +4127,7 @@ const S = {
   tvSchedCheck: { fontFamily: "'Oswald', sans-serif", fontSize: 18, color: T.gold, fontWeight: 700, flexShrink: 0 },
   tvSchedVs: { fontFamily: "'Oswald', sans-serif", fontSize: 11, fontWeight: 700, color: T.gold, letterSpacing: 2, opacity: 0.6 },
   tvSchedEmpty: { fontFamily: "'Oswald', sans-serif", fontSize: 16, color: 'rgba(245,238,220,0.2)', padding: '6px 0' },
+  tvSchedEst: { marginLeft: 8, fontSize: 11, fontWeight: 700, letterSpacing: 1, color: '#e8a020', opacity: 0.9 },
 
   // PRINT
   printBackdrop: { position: 'fixed', inset: 0, background: '#fff', zIndex: 1000, overflowY: 'auto', padding: 20 },
