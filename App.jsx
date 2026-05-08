@@ -1,4 +1,7 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
+import { supabase } from './supabase.js';
+
+const ROOM_ID = 'atlas-supreme-invitational';
 
 // ═══════════════════════════════════════════════════════════════════════════
 // ATLAS SUPREME INVITATIONAL — TOURNAMENT APP
@@ -321,23 +324,76 @@ export default function App() {
   const [printMode, setPrintMode] = useState(false);
   const [loaded, setLoaded] = useState(false);
   const [toast, setToast] = useState(null);
+  const [session, setSession]             = useState(null);
+  const [showLogin, setShowLogin]         = useState(false);
+  const [loginEmail, setLoginEmail]       = useState('');
+  const [loginPassword, setLoginPassword] = useState('');
+  const [loginError, setLoginError]       = useState('');
+  const [loginLoading, setLoginLoading]   = useState(false);
+  const isAdmin = !!session;
 
-  // Persistence — uses localStorage. Swap for backend (Supabase/Firebase) for multi-device sync.
+  // Auth — watch for login / logout
   useEffect(() => {
-    try {
-      const raw = localStorage.getItem(STORAGE_KEY);
-      if (raw) setData(JSON.parse(raw));
-    } catch (e) { console.warn('Failed to load saved state:', e); }
-    setLoaded(true);
+    supabase.auth.getSession().then(({ data: { session } }) => setSession(session));
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_e, session) => {
+      setSession(session);
+    });
+    return () => subscription.unsubscribe();
   }, []);
 
+  // Load from Supabase + real-time sync for all viewers
   useEffect(() => {
-    if (!loaded) return;
-    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(data)); }
-    catch (e) { console.warn('Failed to save state:', e); }
-  }, [data, loaded]);
+    supabase
+      .from('tournament_state')
+      .select('data')
+      .eq('id', ROOM_ID)
+      .single()
+      .then(({ data: row }) => {
+        if (row?.data) setData(row.data);
+        setLoaded(true);
+      });
+
+    const channel = supabase
+      .channel('tournament')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'tournament_state' }, payload => {
+        if (payload.new?.data) setData(payload.new.data);
+      })
+      .subscribe();
+
+    return () => supabase.removeChannel(channel);
+  }, []);
+
+  // Save to Supabase — admins only
+  useEffect(() => {
+    if (!loaded || !isAdmin) return;
+    supabase.from('tournament_state').upsert({
+      id: ROOM_ID,
+      data,
+      updated_at: new Date().toISOString(),
+    });
+  }, [data, loaded, isAdmin]);
 
   const showToast = (msg) => { setToast(msg); setTimeout(() => setToast(null), 1800); };
+
+  // ─── Auth ops ────────────────────────────────────────────────────────────
+  const handleLogin = async () => {
+    setLoginLoading(true);
+    setLoginError('');
+    const { error } = await supabase.auth.signInWithPassword({
+      email: loginEmail,
+      password: loginPassword,
+    });
+    if (error) {
+      setLoginError(error.message);
+    } else {
+      setShowLogin(false);
+      setLoginEmail('');
+      setLoginPassword('');
+    }
+    setLoginLoading(false);
+  };
+
+  const handleLogout = () => supabase.auth.signOut();
 
   // ─── Player ops ──────────────────────────────────────────────────────────
   const updatePlayerName = (playerId, newName) => {
@@ -591,23 +647,32 @@ export default function App() {
             {tab === 'schedule' && (
               <button style={S.iconBtn} onClick={() => setPrintMode(true)} title="Print">🖨️</button>
             )}
-            <button
-              style={data.locked ? S.lockBtnActive : S.iconBtn}
-              onClick={toggleLock}
-              title={data.locked ? 'Unlock bracket' : 'Lock bracket'}
-            >
-              {data.locked ? '🔒' : '🔓'}
-            </button>
-            <button style={S.iconBtn} onClick={() => setResetMenu(true)} title="Reset">↻</button>
+            {isAdmin && (
+              <>
+                <button
+                  style={data.locked ? S.lockBtnActive : S.iconBtn}
+                  onClick={toggleLock}
+                  title={data.locked ? 'Unlock bracket' : 'Lock bracket'}
+                >
+                  {data.locked ? '🔒' : '🔓'}
+                </button>
+                <button style={S.iconBtn} onClick={() => setResetMenu(true)} title="Reset">↻</button>
+              </>
+            )}
+            {isAdmin ? (
+              <button style={S.adminBadgeBtn} onClick={handleLogout} title="Logout">ADMIN ✓</button>
+            ) : (
+              <button style={S.loginBtn} onClick={() => setShowLogin(true)}>LOGIN</button>
+            )}
           </div>
         </header>
 
         {/* LOCKED BANNER */}
-        {data.locked && (
+        {(data.locked || !isAdmin) && (
           <div style={S.lockBanner}>
             <span>🔒</span>
-            <span>BRACKET LOCKED</span>
-            <button style={S.lockBannerBtn} onClick={toggleLock}>UNLOCK</button>
+            <span>{!isAdmin ? 'VIEW ONLY' : 'BRACKET LOCKED'}</span>
+            {isAdmin && <button style={S.lockBannerBtn} onClick={toggleLock}>UNLOCK</button>}
           </div>
         )}
 
@@ -637,15 +702,15 @@ export default function App() {
               data={data}
               activeRound={activeRound}
               setActiveRound={setActiveRound}
-              onTeamTap={advanceWinner}
-              onSlotTap={(teamId, slotIndex) => setPicker({ teamId, slotIndex })}
-              onRemovePlayer={removePlayer}
+              onTeamTap={isAdmin ? advanceWinner : undefined}
+              onSlotTap={isAdmin ? (teamId, slotIndex) => setPicker({ teamId, slotIndex }) : undefined}
+              onRemovePlayer={isAdmin ? removePlayer : undefined}
               editTeamMode={editTeamMode}
               setEditTeamMode={setEditTeamMode}
-              onScoreEdit={setScoreEditor}
+              onScoreEdit={isAdmin ? setScoreEditor : undefined}
               onShareMatch={setShareCard}
-              onSeedEdit={setSeedEditor}
-              locked={data.locked}
+              onSeedEdit={isAdmin ? setSeedEditor : undefined}
+              locked={data.locked || !isAdmin}
             />
           )}
           {tab === 'schedule' && (
@@ -654,9 +719,9 @@ export default function App() {
           {tab === 'players' && (
             <PlayersView
               data={data}
-              editingPlayer={editingPlayer}
-              setEditingPlayer={setEditingPlayer}
-              updatePlayerName={updatePlayerName}
+              editingPlayer={isAdmin ? editingPlayer : null}
+              setEditingPlayer={isAdmin ? setEditingPlayer : () => {}}
+              updatePlayerName={isAdmin ? updatePlayerName : () => {}}
               getPlayerTeam={getPlayerTeam}
               onPlayerSchedule={(pid) => setPlayerSchedule({ playerId: pid })}
             />
@@ -721,6 +786,36 @@ export default function App() {
           />
         )}
         {toast && <div style={S.toast}>{toast}</div>}
+
+        {/* LOGIN MODAL */}
+        {showLogin && (
+          <div style={S.overlay} onClick={() => setShowLogin(false)}>
+            <div style={S.loginModal} onClick={e => e.stopPropagation()}>
+              <div style={S.loginTitle}>ADMIN LOGIN</div>
+              <input
+                style={S.loginInput}
+                type="email"
+                placeholder="Email"
+                value={loginEmail}
+                onChange={e => setLoginEmail(e.target.value)}
+                autoComplete="email"
+              />
+              <input
+                style={S.loginInput}
+                type="password"
+                placeholder="Password"
+                value={loginPassword}
+                onChange={e => setLoginPassword(e.target.value)}
+                onKeyDown={e => e.key === 'Enter' && handleLogin()}
+                autoComplete="current-password"
+              />
+              {loginError && <div style={S.loginError}>{loginError}</div>}
+              <button style={S.loginSubmit} onClick={handleLogin} disabled={loginLoading}>
+                {loginLoading ? 'Signing in…' : 'Sign In'}
+              </button>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
@@ -2946,6 +3041,16 @@ const S = {
   printMatch: { fontSize: 11, lineHeight: 1.5 },
   printVs: { textAlign: 'center', fontWeight: 700, color: '#D4A54B', margin: '4px 0' },
   printFooter: { textAlign: 'center', paddingTop: 20, borderTop: '2px solid #000', fontSize: 13, fontWeight: 700 },
+
+  // Auth
+  loginBtn:     { background: 'transparent', border: `1px solid ${T.rim}`, color: T.ivoryDim, padding: '4px 12px', borderRadius: 6, cursor: 'pointer', fontSize: 12, fontFamily: 'Oswald, sans-serif', letterSpacing: 1 },
+  adminBadgeBtn:{ background: '#0d3d22', border: `1px solid ${T.gold}`, color: T.gold, padding: '4px 12px', borderRadius: 6, cursor: 'pointer', fontSize: 12, fontFamily: 'Oswald, sans-serif', letterSpacing: 1 },
+  overlay:      { position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.75)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 },
+  loginModal:   { background: T.bg, border: `1px solid ${T.gold}`, borderRadius: 14, padding: 32, display: 'flex', flexDirection: 'column', gap: 14, width: 300, boxShadow: `0 0 40px rgba(212,165,75,0.2)` },
+  loginTitle:   { color: T.gold, fontSize: 20, fontWeight: 700, fontFamily: 'Oswald, sans-serif', letterSpacing: 2, textAlign: 'center', marginBottom: 4 },
+  loginInput:   { background: T.bgDeep, border: `1px solid ${T.rim}`, borderRadius: 8, padding: '11px 14px', color: T.ivory, fontSize: 15, outline: 'none', fontFamily: 'Barlow Condensed, sans-serif' },
+  loginError:   { color: T.red, fontSize: 13, textAlign: 'center' },
+  loginSubmit:  { background: T.gold, border: 'none', color: T.bgDeep, padding: '13px', borderRadius: 8, cursor: 'pointer', fontSize: 15, fontWeight: 700, fontFamily: 'Oswald, sans-serif', letterSpacing: 1 },
 };
 
 // ═══════════════════════════════════════════════════════════════════════════
