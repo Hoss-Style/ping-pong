@@ -1106,7 +1106,7 @@ function DesktopBracketView({ data, onTeamTap, onScoreEdit, onShareMatch, locked
     const compute = () => {
       if (!containerRef.current) return;
       const available = containerRef.current.offsetWidth - 48;
-      setScale(Math.min(1, available / totalW));
+      setScale(available / totalW);
     };
     compute();
     window.addEventListener('resize', compute);
@@ -1443,9 +1443,7 @@ function TimeSlot({ slot, data, tableFilter, isLive, isPast, isNext }) {
       <div style={S.slotTime}>
         {isLive && <div style={S.slotLiveBadge}>LIVE</div>}
         {isNext && <div style={S.slotNextBadge}>NEXT</div>}
-        {slot.time.split('–').map((t, i) => (
-          <div key={i} style={S.slotTimeMain}>{t.trim()}</div>
-        ))}
+        <div style={S.slotTimeMain}>{slot.time}</div>
         <div style={S.slotTimeDuration}>{slot.duration}</div>
       </div>
       <div style={S.slotMatches}>
@@ -2790,7 +2788,7 @@ const S = {
   timeSlotLive: { background: 'rgba(199,72,74,0.08)', boxShadow: `inset 4px 0 0 ${T.red}` },
   timeSlotPast: { opacity: 0.45 },
   slotTime: {
-    width: 84, padding: 12,
+    width: 108, padding: '10px 8px',
     background: T.bgCard,
     borderRight: `1px solid ${T.rim}`,
     display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 2,
@@ -2807,8 +2805,8 @@ const S = {
     padding: '2px 6px', borderRadius: 3, marginBottom: 4,
   },
   slotTimeMain: {
-    fontFamily: "'Oswald', sans-serif", fontSize: 13, fontWeight: 700, letterSpacing: 1.5,
-    color: T.gold, textAlign: 'center', lineHeight: 1.1,
+    fontFamily: "'Oswald', sans-serif", fontSize: 11, fontWeight: 700, letterSpacing: 0.5,
+    color: T.gold, textAlign: 'center', lineHeight: 1.2, whiteSpace: 'nowrap',
   },
   slotTimeDuration: { fontFamily: "'Barlow Condensed', sans-serif", fontSize: 10, color: 'rgba(245,238,220,0.5)' },
   slotMatches: { flex: 1, display: 'flex', background: T.bgCard },
