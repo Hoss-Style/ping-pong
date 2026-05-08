@@ -662,17 +662,17 @@ export default function App() {
             {isAdmin ? (
               <button style={S.adminBadgeBtn} onClick={handleLogout} title="Logout">ADMIN ✓</button>
             ) : (
-              <button style={S.loginBtn} onClick={() => setShowLogin(true)}>LOGIN</button>
+              <button style={S.loginBtn} onClick={() => setShowLogin(true)} title="Admin login">ADMIN</button>
             )}
           </div>
         </header>
 
         {/* LOCKED BANNER */}
-        {(data.locked || !isAdmin) && (
+        {isAdmin && data.locked && (
           <div style={S.lockBanner}>
             <span>🔒</span>
-            <span>{!isAdmin ? 'VIEW ONLY' : 'BRACKET LOCKED'}</span>
-            {isAdmin && <button style={S.lockBannerBtn} onClick={toggleLock}>UNLOCK</button>}
+            <span>BRACKET LOCKED</span>
+            <button style={S.lockBannerBtn} onClick={toggleLock}>UNLOCK</button>
           </div>
         )}
 
@@ -3043,7 +3043,7 @@ const S = {
   printFooter: { textAlign: 'center', paddingTop: 20, borderTop: '2px solid #000', fontSize: 13, fontWeight: 700 },
 
   // Auth
-  loginBtn:     { background: 'transparent', border: `1px solid ${T.rim}`, color: T.ivoryDim, padding: '4px 12px', borderRadius: 6, cursor: 'pointer', fontSize: 12, fontFamily: 'Oswald, sans-serif', letterSpacing: 1 },
+  loginBtn:     { background: 'transparent', border: 'none', color: T.bgSoft, padding: '4px 8px', borderRadius: 6, cursor: 'pointer', fontSize: 11, fontFamily: 'Oswald, sans-serif', letterSpacing: 1, opacity: 0.5 },
   adminBadgeBtn:{ background: '#0d3d22', border: `1px solid ${T.gold}`, color: T.gold, padding: '4px 12px', borderRadius: 6, cursor: 'pointer', fontSize: 12, fontFamily: 'Oswald, sans-serif', letterSpacing: 1 },
   overlay:      { position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.75)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 },
   loginModal:   { background: T.bg, border: `1px solid ${T.gold}`, borderRadius: 14, padding: 32, display: 'flex', flexDirection: 'column', gap: 14, width: 300, boxShadow: `0 0 40px rgba(212,165,75,0.2)` },
