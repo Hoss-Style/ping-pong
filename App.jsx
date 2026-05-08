@@ -710,7 +710,7 @@ export default function App() {
           {[
             { id: 'bracket',  label: 'BRACKET',  sub: `${stats.complete}/18` },
             { id: 'schedule', label: 'SCHEDULE', sub: '3 TABLES' },
-            { id: 'players',  label: 'PLAYERS',  sub: `${stats.placed}/36` },
+            { id: 'players',  label: 'TEAMS',     sub: `${stats.placed}/36` },
             { id: 'stats',    label: 'STATS',    sub: 'LIVE' },
           ].map(t => (
             <button
@@ -764,11 +764,41 @@ export default function App() {
           {tab === 'players' && (
             <PlayersView
               data={data}
+              isAdmin={isAdmin}
               editingPlayer={isAdmin ? editingPlayer : null}
               setEditingPlayer={isAdmin ? setEditingPlayer : () => {}}
               updatePlayerName={isAdmin ? updatePlayerName : () => {}}
               getPlayerTeam={getPlayerTeam}
               onPlayerSchedule={(pid) => setPlayerSchedule({ playerId: pid })}
+              onSlotTap={isAdmin ? (teamId, slotIndex) => setPicker({ teamId, slotIndex }) : undefined}
+              onAddAlternate={isAdmin ? (name) => {
+                const next = cloneData(data);
+                if (!next.alternates) next.alternates = [];
+                next.alternates.push({ id: `alt_${Date.now()}`, name: name.trim().toUpperCase() });
+                setData(next);
+              } : undefined}
+              onRemoveAlternate={isAdmin ? (altId) => {
+                const next = cloneData(data);
+                next.alternates = (next.alternates || []).filter(a => a.id !== altId);
+                setData(next);
+              } : undefined}
+              onAssignAlternate={isAdmin ? (altId, teamId, slotIndex) => {
+                const next = cloneData(data);
+                const alt = (next.alternates || []).find(a => a.id === altId);
+                if (!alt) return;
+                // Remove alt from alternates list
+                next.alternates = next.alternates.filter(a => a.id !== altId);
+                // Check if there's already a player in that slot — move them back to unplaced (they stay in players list)
+                // Add alt as a real player
+                const newPlayer = { id: alt.id, name: alt.name };
+                if (!next.players.find(p => p.id === alt.id)) next.players.push(newPlayer);
+                // Remove from any other team
+                Object.keys(next.teams).forEach(tid => {
+                  next.teams[tid].playerIds = next.teams[tid].playerIds.map(pid => pid === alt.id ? null : pid);
+                });
+                next.teams[teamId].playerIds[slotIndex] = alt.id;
+                setData(next);
+              } : undefined}
             />
           )}
           {tab === 'stats' && <StatsView data={data} />}
@@ -1748,28 +1778,165 @@ function SlotMatch({ matchId, tableNum, data, isLast }) {
 // ═══════════════════════════════════════════════════════════════════════════
 // PLAYERS VIEW
 // ═══════════════════════════════════════════════════════════════════════════
-function PlayersView({ data, editingPlayer, setEditingPlayer, updatePlayerName,
-                       getPlayerTeam, onPlayerSchedule }) {
+function PlayersView({ data, isAdmin, editingPlayer, setEditingPlayer, updatePlayerName,
+                       getPlayerTeam, onPlayerSchedule, onSlotTap,
+                       onAddAlternate, onRemoveAlternate, onAssignAlternate }) {
+  const [subTab, setSubTab] = useState('teams');
+  const [newAltName, setNewAltName] = useState('');
+
+  const leftTeams  = Object.values(data.teams).filter(t => t.side === 'L').sort((a,b) => a.seed - b.seed);
+  const rightTeams = Object.values(data.teams).filter(t => t.side === 'R').sort((a,b) => a.seed - b.seed);
+  const alternates = data.alternates || [];
+
   return (
     <div style={S.playersView}>
-      <div style={S.sectionHeader}>
-        <div style={S.sectionTitle}>36 PLAYERS</div>
-        <div style={S.sectionSub}>Tap name to rename · Tap 📅 for player schedule</div>
-      </div>
-      <div style={S.playerList}>
-        {data.players.map((player, idx) => (
-          <PlayerRow
-            key={player.id}
-            player={player}
-            num={idx + 1}
-            team={getPlayerTeam(player.id)}
-            isEditing={editingPlayer === player.id}
-            onEditStart={() => setEditingPlayer(player.id)}
-            onEditEnd={() => setEditingPlayer(null)}
-            onSave={(name) => { updatePlayerName(player.id, name); setEditingPlayer(null); }}
-            onShowSchedule={() => onPlayerSchedule(player.id)}
-          />
+      {/* Sub-tab bar */}
+      <div style={S.subTabBar}>
+        {[['teams','TEAMS'],['players','PLAYERS'],['alternates','SUBS']].map(([id, label]) => (
+          <button key={id} style={subTab === id ? S.subTabActive : S.subTab}
+            onClick={() => setSubTab(id)}>{label}</button>
         ))}
+      </div>
+
+      {/* TEAMS sub-tab */}
+      {subTab === 'teams' && (
+        <div style={S.teamsGrid}>
+          {[{ label: 'LEFT BRACKET', teams: leftTeams }, { label: 'RIGHT BRACKET', teams: rightTeams }].map(({ label, teams }) => (
+            <div key={label} style={S.teamsSide}>
+              <div style={S.teamsSideLabel}>{label}</div>
+              {teams.map(team => {
+                const p1 = team.playerIds[0] ? data.players.find(p => p.id === team.playerIds[0]) : null;
+                const p2 = team.playerIds[1] ? data.players.find(p => p.id === team.playerIds[1]) : null;
+                return (
+                  <div key={team.id} style={S.teamCard}>
+                    <div style={S.teamCardSeed}>
+                      <div style={S.teamSeedNum}>{team.seed}</div>
+                      {team.pi && <div style={S.teamPiTag}>PI</div>}
+                    </div>
+                    <div style={S.teamCardSlots}>
+                      <TeamSlot name={p1?.name} empty={!p1}
+                        onTap={isAdmin ? () => onSlotTap(team.id, 0) : undefined} />
+                      <TeamSlot name={p2?.name} empty={!p2}
+                        onTap={isAdmin ? () => onSlotTap(team.id, 1) : undefined} />
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* PLAYERS sub-tab */}
+      {subTab === 'players' && (
+        <div style={S.playerList}>
+          {data.players.map((player, idx) => (
+            <PlayerRow
+              key={player.id}
+              player={player}
+              num={idx + 1}
+              team={getPlayerTeam(player.id)}
+              isEditing={editingPlayer === player.id}
+              onEditStart={() => isAdmin && setEditingPlayer(player.id)}
+              onEditEnd={() => setEditingPlayer(null)}
+              onSave={(name) => { updatePlayerName(player.id, name); setEditingPlayer(null); }}
+              onShowSchedule={() => onPlayerSchedule(player.id)}
+            />
+          ))}
+        </div>
+      )}
+
+      {/* ALTERNATES sub-tab */}
+      {subTab === 'alternates' && (
+        <div style={S.altView}>
+          <div style={S.altInfo}>
+            Subs can be assigned to any open team slot. They'll be added as a player and removed from this list.
+          </div>
+          {isAdmin && (
+            <div style={S.altAddRow}>
+              <input
+                placeholder="ALT PLAYER NAME"
+                value={newAltName}
+                onChange={e => setNewAltName(e.target.value)}
+                onKeyDown={e => {
+                  if (e.key === 'Enter' && newAltName.trim()) {
+                    onAddAlternate(newAltName.trim());
+                    setNewAltName('');
+                  }
+                }}
+                style={S.altInput}
+                autoCapitalize="characters" autoCorrect="off"
+              />
+              <button
+                style={S.altAddBtn}
+                disabled={!newAltName.trim()}
+                onClick={() => { if (newAltName.trim()) { onAddAlternate(newAltName.trim()); setNewAltName(''); } }}
+              >+ ADD</button>
+            </div>
+          )}
+          {alternates.length === 0 ? (
+            <div style={S.altEmpty}>No alternates added yet.{isAdmin ? ' Add names above.' : ''}</div>
+          ) : alternates.map(alt => (
+            <AltRow key={alt.id} alt={alt} data={data} isAdmin={isAdmin}
+              onRemove={() => onRemoveAlternate(alt.id)}
+              onAssign={(teamId, slotIndex) => onAssignAlternate(alt.id, teamId, slotIndex)} />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function TeamSlot({ name, empty, onTap }) {
+  return (
+    <div style={{ ...S.teamSlot, ...(empty ? S.teamSlotEmpty : {}), cursor: onTap ? 'pointer' : 'default' }}
+         onClick={onTap}>
+      {empty ? <span style={S.teamSlotPlaceholder}>TAP TO ASSIGN</span> : <span style={S.teamSlotName}>{name}</span>}
+      {onTap && <span style={S.teamSlotEdit}>✎</span>}
+    </div>
+  );
+}
+
+function AltRow({ alt, data, isAdmin, onRemove, onAssign }) {
+  const [assigning, setAssigning] = useState(false);
+  const allTeams = Object.values(data.teams).sort((a,b) => a.side === b.side ? a.seed - b.seed : a.side.localeCompare(b.side));
+
+  if (assigning) {
+    return (
+      <div style={S.altAssignPanel}>
+        <div style={S.altAssignTitle}>Assign <b>{alt.name}</b> to:</div>
+        <div style={S.altAssignList}>
+          {allTeams.map(team => {
+            const p1 = team.playerIds[0] ? data.players.find(p => p.id === team.playerIds[0]) : null;
+            const p2 = team.playerIds[1] ? data.players.find(p => p.id === team.playerIds[1]) : null;
+            return (
+              <div key={team.id} style={S.altAssignTeam}>
+                <div style={S.altAssignSeed}>{team.side}{team.seed}</div>
+                <div style={S.altAssignSlots}>
+                  <button style={{ ...S.altAssignSlotBtn, ...(p1 ? S.altAssignSlotReplace : S.altAssignSlotEmpty) }}
+                    onClick={() => { onAssign(team.id, 0); setAssigning(false); }}>
+                    {p1 ? `↔ ${p1.name}` : '+ SLOT 1 (EMPTY)'}
+                  </button>
+                  <button style={{ ...S.altAssignSlotBtn, ...(p2 ? S.altAssignSlotReplace : S.altAssignSlotEmpty) }}
+                    onClick={() => { onAssign(team.id, 1); setAssigning(false); }}>
+                    {p2 ? `↔ ${p2.name}` : '+ SLOT 2 (EMPTY)'}
+                  </button>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+        <button style={S.altCancelBtn} onClick={() => setAssigning(false)}>CANCEL</button>
+      </div>
+    );
+  }
+
+  return (
+    <div style={S.altRow}>
+      <div style={S.altName}>{alt.name}</div>
+      <div style={S.altActions}>
+        {isAdmin && <button style={S.altAssignBtn} onClick={() => setAssigning(true)}>ASSIGN →</button>}
+        {isAdmin && <button style={S.altRemoveBtn} onClick={onRemove}>✕</button>}
       </div>
     </div>
   );
@@ -3218,7 +3385,97 @@ const S = {
   scheduleNote: { fontFamily: "'Barlow Condensed', sans-serif", fontSize: 12, color: T.ivory, lineHeight: 1.5, marginBottom: 6 },
 
   // PLAYERS
-  playersView: { padding: '12px 12px 16px' },
+  playersView: { padding: '0 0 16px', display: 'flex', flexDirection: 'column' },
+
+  // Sub-tabs
+  subTabBar: { display: 'flex', borderBottom: `1px solid ${T.rim}`, marginBottom: 12, gap: 0 },
+  subTab: {
+    flex: 1, padding: '10px 4px', background: 'transparent', border: 'none', borderBottom: '2px solid transparent',
+    color: 'rgba(245,238,220,0.5)', fontFamily: "'Oswald', sans-serif", fontSize: 12, fontWeight: 700,
+    letterSpacing: 2, cursor: 'pointer', transition: 'color 0.15s',
+  },
+  subTabActive: {
+    flex: 1, padding: '10px 4px', background: 'transparent', border: 'none', borderBottom: `2px solid ${T.gold}`,
+    color: T.gold, fontFamily: "'Oswald', sans-serif", fontSize: 12, fontWeight: 700,
+    letterSpacing: 2, cursor: 'pointer',
+  },
+
+  // Teams grid
+  teamsGrid: { display: 'flex', gap: 10, padding: '0 12px' },
+  teamsSide: { flex: 1, display: 'flex', flexDirection: 'column', gap: 6 },
+  teamsSideLabel: { fontFamily: "'Oswald', sans-serif", fontSize: 10, fontWeight: 700, letterSpacing: 3, color: T.gold, opacity: 0.7, marginBottom: 4, textAlign: 'center' },
+  teamCard: {
+    display: 'flex', alignItems: 'stretch', gap: 0,
+    background: T.bgCard, border: `1px solid ${T.rim}`, borderRadius: 6, overflow: 'hidden',
+  },
+  teamCardSeed: {
+    display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+    padding: '6px 10px', background: T.bgSoft, borderRight: `1px solid ${T.rim}`, minWidth: 36,
+  },
+  teamSeedNum: { fontFamily: "'Oswald', sans-serif", fontSize: 18, fontWeight: 700, color: T.gold, lineHeight: 1 },
+  teamPiTag: { fontFamily: "'Oswald', sans-serif", fontSize: 8, fontWeight: 700, letterSpacing: 1, color: T.goldBr, marginTop: 2 },
+  teamCardSlots: { flex: 1, display: 'flex', flexDirection: 'column' },
+  teamSlot: {
+    display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+    padding: '6px 10px', borderBottom: `1px solid ${T.rim}`, gap: 6, minHeight: 32,
+  },
+  teamSlotEmpty: { background: 'rgba(255,255,255,0.02)' },
+  teamSlotName: { fontFamily: "'Oswald', sans-serif", fontSize: 13, fontWeight: 600, color: T.ivory, flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
+  teamSlotPlaceholder: { fontFamily: "'Barlow Condensed', sans-serif", fontSize: 11, color: 'rgba(245,238,220,0.3)', fontStyle: 'italic', flex: 1 },
+  teamSlotEdit: { fontSize: 11, color: T.gold, opacity: 0.5, flexShrink: 0 },
+
+  // Alternates
+  altView: { padding: '0 12px', display: 'flex', flexDirection: 'column', gap: 10 },
+  altInfo: { fontFamily: "'Barlow Condensed', sans-serif", fontSize: 12, color: 'rgba(245,238,220,0.5)', lineHeight: 1.5, padding: '8px 0' },
+  altAddRow: { display: 'flex', gap: 8 },
+  altInput: {
+    flex: 1, background: T.bgCard, border: `1px solid ${T.rim}`, borderRadius: 6,
+    color: T.ivory, fontFamily: "'Oswald', sans-serif", fontSize: 14, fontWeight: 600,
+    padding: '10px 12px', textTransform: 'uppercase', outline: 'none',
+  },
+  altAddBtn: {
+    background: 'rgba(212,165,75,0.18)', color: T.gold, border: `1px solid ${T.gold}`,
+    fontFamily: "'Oswald', sans-serif", fontSize: 12, fontWeight: 700, letterSpacing: 1,
+    padding: '0 14px', borderRadius: 6, cursor: 'pointer',
+  },
+  altEmpty: { fontFamily: "'Barlow Condensed', sans-serif", fontSize: 13, color: 'rgba(245,238,220,0.35)', textAlign: 'center', padding: '24px 0', fontStyle: 'italic' },
+  altRow: {
+    display: 'flex', alignItems: 'center', gap: 10, padding: '12px',
+    background: T.bgCard, border: `1px solid ${T.rim}`, borderRadius: 6,
+  },
+  altName: { flex: 1, fontFamily: "'Oswald', sans-serif", fontSize: 15, fontWeight: 600, color: T.ivory, textTransform: 'uppercase' },
+  altActions: { display: 'flex', gap: 6 },
+  altAssignBtn: {
+    background: 'rgba(212,165,75,0.15)', color: T.gold, border: `1px solid ${T.gold}`,
+    fontFamily: "'Oswald', sans-serif", fontSize: 11, fontWeight: 700, letterSpacing: 1,
+    padding: '6px 12px', borderRadius: 5, cursor: 'pointer',
+  },
+  altRemoveBtn: {
+    background: 'rgba(200,50,50,0.1)', color: T.red, border: `1px solid rgba(200,50,50,0.3)`,
+    fontFamily: "'Oswald', sans-serif", fontSize: 13, fontWeight: 700,
+    padding: '6px 10px', borderRadius: 5, cursor: 'pointer',
+  },
+  altAssignPanel: {
+    background: T.bgCard, border: `1px solid ${T.gold}`, borderRadius: 8,
+    padding: 14, display: 'flex', flexDirection: 'column', gap: 10,
+  },
+  altAssignTitle: { fontFamily: "'Oswald', sans-serif", fontSize: 13, color: T.ivory, letterSpacing: 0.5 },
+  altAssignList: { display: 'flex', flexDirection: 'column', gap: 6, maxHeight: 300, overflowY: 'auto' },
+  altAssignTeam: { display: 'flex', alignItems: 'center', gap: 10 },
+  altAssignSeed: { fontFamily: "'Oswald', sans-serif", fontSize: 13, fontWeight: 700, color: T.gold, minWidth: 32 },
+  altAssignSlots: { flex: 1, display: 'flex', gap: 6 },
+  altAssignSlotBtn: {
+    flex: 1, fontFamily: "'Barlow Condensed', sans-serif", fontSize: 12, fontWeight: 600,
+    padding: '6px 8px', borderRadius: 5, cursor: 'pointer', textAlign: 'left',
+    overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+  },
+  altAssignSlotEmpty: { background: 'rgba(212,165,75,0.12)', color: T.gold, border: `1px solid ${T.gold}` },
+  altAssignSlotReplace: { background: 'rgba(200,50,50,0.1)', color: '#e07070', border: `1px solid rgba(200,50,50,0.3)` },
+  altCancelBtn: {
+    alignSelf: 'flex-start', background: 'transparent', color: 'rgba(245,238,220,0.5)',
+    border: `1px solid ${T.rim}`, fontFamily: "'Oswald', sans-serif", fontSize: 11, fontWeight: 700,
+    letterSpacing: 1, padding: '6px 14px', borderRadius: 5, cursor: 'pointer',
+  },
   sectionHeader: { padding: '4px 4px 12px' },
   sectionTitle: { fontFamily: "'Oswald', sans-serif", fontSize: 14, fontWeight: 700, letterSpacing: 3, color: T.gold },
   sectionSub: { fontFamily: "'Barlow Condensed', sans-serif", fontSize: 12, color: 'rgba(245,238,220,0.5)', marginTop: 2 },
