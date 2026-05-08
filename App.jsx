@@ -195,6 +195,16 @@ function makeMatch() {
   return { slots: [null, null], winner: null, scores: { team1: [], team2: [] }, isForfeit: false };
 }
 
+function getTeamDisplayName(team, data) {
+  if (team?.name) return team.name;
+  const p1 = team?.playerIds[0] ? data.players.find(p => p.id === team.playerIds[0]) : null;
+  const p2 = team?.playerIds[1] ? data.players.find(p => p.id === team.playerIds[1]) : null;
+  if (p1 && p2) return `${p1.name} / ${p2.name}`;
+  if (p1) return p1.name;
+  if (p2) return p2.name;
+  return 'TBD';
+}
+
 function getEffectiveSlots(data) {
   return SCHEDULE_SLOTS.map((slot, i) => {
     const override = data?.scheduleTimes?.[i];
@@ -771,6 +781,11 @@ export default function App() {
               getPlayerTeam={getPlayerTeam}
               onPlayerSchedule={(pid) => setPlayerSchedule({ playerId: pid })}
               onSlotTap={isAdmin ? (teamId, slotIndex) => setPicker({ teamId, slotIndex }) : undefined}
+              onTeamNameEdit={isAdmin ? (teamId, name) => {
+                const next = cloneData(data);
+                next.teams[teamId].name = name || null;
+                setData(next);
+              } : undefined}
               onAddAlternate={isAdmin ? (name) => {
                 const next = cloneData(data);
                 if (!next.alternates) next.alternates = [];
@@ -1391,6 +1406,8 @@ function TVMatchCard({ matchId, data, width, isFinal = false }) {
     const team = data.teams[teamId];
     const p1 = team.playerIds[0] ? data.players.find(p => p.id === team.playerIds[0]) : null;
     const p2 = team.playerIds[1] ? data.players.find(p => p.id === team.playerIds[1]) : null;
+    const displayName = getTeamDisplayName(team, data);
+    const hasTeamName = !!team.name;
 
     return (
       <div style={{
@@ -1405,11 +1422,18 @@ function TVMatchCard({ matchId, data, width, isFinal = false }) {
         </span>
         <div style={S.tvmcNames}>
           <div style={{ ...S.tvmcName, ...(isFinal ? S.tvmcNameFinal : {}), ...(champWin ? { color: T.bgDeep } : {}) }}>
-            {p1?.name || '—'}
+            {hasTeamName ? team.name : (p1?.name || '—')}
           </div>
-          <div style={{ ...S.tvmcName, ...(isFinal ? S.tvmcNameFinal : {}), ...(champWin ? { color: T.bgDeep } : {}) }}>
-            {p2?.name || '—'}
-          </div>
+          {!hasTeamName && (
+            <div style={{ ...S.tvmcName, ...(isFinal ? S.tvmcNameFinal : {}), ...(champWin ? { color: T.bgDeep } : {}) }}>
+              {p2?.name || '—'}
+            </div>
+          )}
+          {hasTeamName && (
+            <div style={{ ...S.tvmcSubNames, ...(champWin ? { color: T.bgDeep, opacity: 0.6 } : {}) }}>
+              {[p1?.name, p2?.name].filter(Boolean).join(' / ') || ''}
+            </div>
+          )}
         </div>
         {isWinner && (
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none"
@@ -1466,6 +1490,7 @@ function DesktopMatchCard({ matchId, data, onTeamTap, onScoreEdit, onShareMatch,
     const p1 = team.playerIds[0] ? data.players.find(p => p.id === team.playerIds[0]) : null;
     const p2 = team.playerIds[1] ? data.players.find(p => p.id === team.playerIds[1]) : null;
     const champWin = isFinal && isWinner;
+    const hasTeamName = !!team.name;
 
     return (
       <div
@@ -1481,10 +1506,15 @@ function DesktopMatchCard({ matchId, data, onTeamTap, onScoreEdit, onShareMatch,
           {team.seed}{team.pi && <span style={S.dmcPiTag}>PI</span>}
         </span>
         <div style={S.dmcPlayerNames}>
-          <div style={{ ...S.dmcPName, ...(champWin ? { color: T.bgDeep } : {}), ...(isFinalCard ? { fontSize: 16, fontWeight: 700 } : {}) }}>
+          {hasTeamName && (
+            <div style={{ ...S.dmcTeamName, ...(champWin ? { color: T.bgDeep } : {}), ...(isFinalCard ? { fontSize: 14 } : {}) }}>
+              {team.name}
+            </div>
+          )}
+          <div style={{ ...S.dmcPName, ...(champWin ? { color: T.bgDeep } : {}), ...(isFinalCard ? { fontSize: 16, fontWeight: 700 } : {}), ...(hasTeamName ? { opacity: 0.6, fontSize: 11 } : {}) }}>
             {p1 ? p1.name : '…'}
           </div>
-          <div style={{ ...S.dmcPName, ...(champWin ? { color: T.bgDeep } : {}), ...(isFinalCard ? { fontSize: 16, fontWeight: 700 } : {}) }}>
+          <div style={{ ...S.dmcPName, ...(champWin ? { color: T.bgDeep } : {}), ...(isFinalCard ? { fontSize: 16, fontWeight: 700 } : {}), ...(hasTeamName ? { opacity: 0.6, fontSize: 11 } : {}) }}>
             {p2 ? p2.name : '…'}
           </div>
         </div>
@@ -1779,7 +1809,7 @@ function SlotMatch({ matchId, tableNum, data, isLast }) {
 // PLAYERS VIEW
 // ═══════════════════════════════════════════════════════════════════════════
 function PlayersView({ data, isAdmin, editingPlayer, setEditingPlayer, updatePlayerName,
-                       getPlayerTeam, onPlayerSchedule, onSlotTap,
+                       getPlayerTeam, onPlayerSchedule, onSlotTap, onTeamNameEdit,
                        onAddAlternate, onRemoveAlternate, onAssignAlternate }) {
   const [subTab, setSubTab] = useState('teams');
   const [newAltName, setNewAltName] = useState('');
@@ -1814,6 +1844,11 @@ function PlayersView({ data, isAdmin, editingPlayer, setEditingPlayer, updatePla
                       {team.pi && <div style={S.teamPiTag}>PI</div>}
                     </div>
                     <div style={S.teamCardSlots}>
+                      <TeamNameSlot
+                        name={team.name || ''}
+                        isAdmin={isAdmin}
+                        onSave={isAdmin ? (n) => onTeamNameEdit(team.id, n) : undefined}
+                      />
                       <TeamSlot name={p1?.name} empty={!p1}
                         onTap={isAdmin ? () => onSlotTap(team.id, 0) : undefined} />
                       <TeamSlot name={p2?.name} empty={!p2}
@@ -1883,6 +1918,45 @@ function PlayersView({ data, isAdmin, editingPlayer, setEditingPlayer, updatePla
           ))}
         </div>
       )}
+    </div>
+  );
+}
+
+function TeamNameSlot({ name, isAdmin, onSave }) {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(name);
+
+  const commit = () => {
+    setEditing(false);
+    onSave(draft.trim().toUpperCase());
+  };
+
+  if (editing) {
+    return (
+      <div style={S.teamNameSlotEditing}>
+        <input
+          autoFocus
+          value={draft}
+          placeholder="TEAM NAME"
+          onChange={e => setDraft(e.target.value)}
+          onBlur={commit}
+          onKeyDown={e => { if (e.key === 'Enter') commit(); if (e.key === 'Escape') setEditing(false); }}
+          style={S.teamNameInput}
+          autoCapitalize="characters" autoCorrect="off"
+        />
+      </div>
+    );
+  }
+
+  return (
+    <div
+      style={{ ...S.teamNameSlot, cursor: isAdmin ? 'pointer' : 'default' }}
+      onClick={isAdmin ? () => { setDraft(name); setEditing(true); } : undefined}
+    >
+      {name
+        ? <span style={S.teamNameText}>{name}</span>
+        : <span style={S.teamNamePlaceholder}>{isAdmin ? '+ TEAM NAME' : '—'}</span>}
+      {isAdmin && <span style={S.teamSlotEdit}>✎</span>}
     </div>
   );
 }
@@ -2585,11 +2659,18 @@ function TVDisplay({ data, onExit }) {
           </div>
           <div style={S.tvChampLabel}>TOURNAMENT CHAMPIONS</div>
           <div style={S.tvChampNames}>
-            {champion.playerIds.map(pid => {
-              const p = data.players.find(pp => pp.id === pid);
-              return <div key={pid}>{p?.name || '—'}</div>;
-            })}
+            {champion.name
+              ? <div>{champion.name}</div>
+              : champion.playerIds.map(pid => {
+                  const p = data.players.find(pp => pp.id === pid);
+                  return <div key={pid}>{p?.name || '—'}</div>;
+                })}
           </div>
+          {champion.name && (
+            <div style={{ fontFamily: "'Oswald', sans-serif", fontSize: 22, color: T.ivory, opacity: 0.6, letterSpacing: 1, marginTop: -8 }}>
+              {champion.playerIds.map(pid => data.players.find(p => p.id === pid)?.name).filter(Boolean).join(' / ')}
+            </div>
+          )}
           <div style={S.tvChampSeed}>
             {champion.side === 'L' ? 'LEFT' : 'RIGHT'} BRACKET · SEED {champion.seed}
           </div>
@@ -2653,8 +2734,8 @@ function TVLiveCard({ tableNum, matchId, data }) {
           <div style={{ ...S.tvLiveTeam, ...(w1 ? S.tvLiveTeamWin : {}), ...(w2 ? S.tvLiveTeamLose : {}) }}>
             <div style={S.tvLiveSeed}>{t1?.seed ?? '—'}</div>
             <div style={S.tvLiveNames}>
-              <div style={S.tvLiveName}>{p1a?.name || '—'}</div>
-              <div style={S.tvLiveName}>{p1b?.name || '—'}</div>
+              <div style={S.tvLiveName}>{t1 ? getTeamDisplayName(t1, data) : '—'}</div>
+              {!t1?.name && p1b && <div style={{ ...S.tvLiveName, display: 'none' }} />}
             </div>
             {w1 && <div style={S.tvLiveWinCheck}>✓</div>}
           </div>
@@ -2662,8 +2743,7 @@ function TVLiveCard({ tableNum, matchId, data }) {
           <div style={{ ...S.tvLiveTeam, ...(w2 ? S.tvLiveTeamWin : {}), ...(w1 ? S.tvLiveTeamLose : {}) }}>
             <div style={S.tvLiveSeed}>{t2?.seed ?? '—'}</div>
             <div style={S.tvLiveNames}>
-              <div style={S.tvLiveName}>{p2a?.name || '—'}</div>
-              <div style={S.tvLiveName}>{p2b?.name || '—'}</div>
+              <div style={S.tvLiveName}>{t2 ? getTeamDisplayName(t2, data) : '—'}</div>
             </div>
             {w2 && <div style={S.tvLiveWinCheck}>✓</div>}
           </div>
@@ -3423,6 +3503,19 @@ const S = {
   teamSlotName: { fontFamily: "'Oswald', sans-serif", fontSize: 13, fontWeight: 600, color: T.ivory, flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
   teamSlotPlaceholder: { fontFamily: "'Barlow Condensed', sans-serif", fontSize: 11, color: 'rgba(245,238,220,0.3)', fontStyle: 'italic', flex: 1 },
   teamSlotEdit: { fontSize: 11, color: T.gold, opacity: 0.5, flexShrink: 0 },
+  teamNameSlot: {
+    display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+    padding: '5px 10px', borderBottom: `1px solid ${T.gold}`, gap: 6, minHeight: 28,
+    background: 'rgba(212,165,75,0.06)',
+  },
+  teamNameSlotEditing: { padding: '3px 6px', borderBottom: `1px solid ${T.gold}`, background: 'rgba(212,165,75,0.1)' },
+  teamNameText: { fontFamily: "'Oswald', sans-serif", fontSize: 13, fontWeight: 700, color: T.gold, letterSpacing: 0.5, flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
+  teamNamePlaceholder: { fontFamily: "'Barlow Condensed', sans-serif", fontSize: 11, color: 'rgba(212,165,75,0.4)', fontStyle: 'italic', flex: 1 },
+  teamNameInput: {
+    width: '100%', background: 'transparent', border: 'none', outline: 'none',
+    fontFamily: "'Oswald', sans-serif", fontSize: 13, fontWeight: 700, color: T.gold,
+    letterSpacing: 0.5, textTransform: 'uppercase', padding: '2px 0',
+  },
 
   // Alternates
   altView: { padding: '0 12px', display: 'flex', flexDirection: 'column', gap: 10 },
@@ -3935,6 +4028,7 @@ const S = {
   tvmcSeedFinal:   { fontSize: 30, minWidth: 36, color: T.goldBr },
   tvmcNames:       { flex: 1, minWidth: 0 },
   tvmcName:        { color: T.ivory, fontSize: 14, fontFamily: 'Barlow Condensed, sans-serif', fontWeight: 600, lineHeight: 1.25, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
+  tvmcSubNames:    { color: T.ivory, fontSize: 10, fontFamily: 'Barlow Condensed, sans-serif', fontWeight: 500, opacity: 0.5, lineHeight: 1.2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginTop: 1 },
   tvmcNameFinal:   { fontSize: 26, fontWeight: 700, fontFamily: 'Oswald, sans-serif', letterSpacing: 0.5 },
 
   // TV Schedule display
@@ -3996,7 +4090,8 @@ const S = {
   dmcSeed:        { color: T.gold, fontSize: 14, fontWeight: 700, fontFamily: 'Oswald, sans-serif', minWidth: 18, textAlign: 'center', flexShrink: 0 },
   dmcSeedEmpty:   { color: T.ivoryDim, fontSize: 14, fontFamily: 'Oswald, sans-serif', minWidth: 18, textAlign: 'center', flexShrink: 0 },
   dmcPiTag:       { fontSize: 8, marginLeft: 1, opacity: 0.7 },
-  dmcPlayerNames: { display: 'flex', flexDirection: 'column', flex: 1, minWidth: 0, gap: 2 },
+  dmcPlayerNames: { display: 'flex', flexDirection: 'column', flex: 1, minWidth: 0, gap: 1 },
+  dmcTeamName:    { color: T.gold, fontSize: 12, fontFamily: 'Oswald, sans-serif', fontWeight: 700, letterSpacing: 0.5, lineHeight: 1.2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
   dmcPName:       { color: T.ivory, fontSize: 13, fontFamily: 'Barlow Condensed, sans-serif', fontWeight: 600, lineHeight: 1.2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
   dmcNameTbd:     { color: T.ivoryDim, fontSize: 13, fontFamily: 'Barlow Condensed, sans-serif' },
 
