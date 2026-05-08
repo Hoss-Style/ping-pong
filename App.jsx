@@ -1175,7 +1175,7 @@ function DesktopBracketView({ data, onTeamTap, onScoreEdit, onShareMatch, locked
         position: 'relative',
       }}>
         {/* Column labels */}
-        <div style={{ position: 'relative', width: totalW, height: 22, marginBottom: 6 }}>
+        <div style={{ position: 'relative', width: totalW, height: 28, marginBottom: 10 }}>
           {LABELS.map(([x, label]) => (
             <div key={label + x} style={{ ...S.dmcColLabel, left: x, width: MW }}>{label}</div>
           ))}
@@ -3306,7 +3306,7 @@ const S = {
 
   // Desktop bracket
   desktopWrap:    { overflow: 'hidden', flex: 1, padding: '20px 24px 32px', display: 'flex', flexDirection: 'column' },
-  dmcColLabel:    { position: 'absolute', textAlign: 'center', color: T.gold, fontSize: 9, fontFamily: 'Oswald, sans-serif', letterSpacing: 1.5, opacity: 0.6, pointerEvents: 'none' },
+  dmcColLabel:    { position: 'absolute', textAlign: 'center', color: T.gold, fontSize: 13, fontFamily: 'Oswald, sans-serif', letterSpacing: 2, opacity: 0.85, pointerEvents: 'none' },
   dmc:            { background: T.bgCard, border: `1px solid ${T.rim}`, borderRadius: 7, overflow: 'hidden', display: 'flex', flexDirection: 'column' },
   dmcHeader:      { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '3px 6px', background: T.bgSoft, borderBottom: `1px solid ${T.rim}`, flexShrink: 0 },
   dmcLabel:       { color: T.ivoryDim, fontSize: 9, fontFamily: 'Oswald, sans-serif', letterSpacing: 0.8, opacity: 0.75 },
