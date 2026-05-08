@@ -341,8 +341,14 @@ export default function App() {
   const [shareCard, setShareCard] = useState(null);
   const [playerSchedule, setPlayerSchedule] = useState(null);
   const [tableFilter, setTableFilter] = useState('all');
-  const [tvMode, setTvMode] = useState(false);
+  const [urlView, setUrlView] = useState(() => new URLSearchParams(window.location.search).get('view') || '');
   const [printMode, setPrintMode] = useState(false);
+
+  const navigateView = (view) => {
+    const url = view ? `?view=${view}` : window.location.pathname;
+    window.history.pushState({}, '', url);
+    setUrlView(view);
+  };
   const [loaded, setLoaded] = useState(false);
   const [toast, setToast] = useState(null);
   const isDesktop = useIsDesktop();
@@ -640,9 +646,12 @@ export default function App() {
 
   const champion = data.matches.FINAL?.winner ? data.teams[data.matches.FINAL.winner] : null;
 
-  // TV mode renders separately
-  if (tvMode) {
-    return <TVDisplay data={data} onExit={() => setTvMode(false)} />;
+  // URL-based view routing
+  if (urlView === 'bracket') {
+    return <TVDisplay data={data} view="bracket" onExit={() => navigateView('')} />;
+  }
+  if (urlView === 'schedule') {
+    return <TVScheduleDisplay data={data} onExit={() => navigateView('')} />;
   }
   if (printMode) {
     return <PrintSchedule data={data} onClose={() => setPrintMode(false)} />;
@@ -665,7 +674,8 @@ export default function App() {
             <div style={S.eventLabel}>INVITATIONAL · {EVENT_DATE}</div>
           </div>
           <div style={S.headerActions}>
-            <button style={S.iconBtn} onClick={() => setTvMode(true)} title="TV Mode">📺</button>
+            <button style={S.iconBtn} onClick={() => navigateView('bracket')} title="Bracket TV">📺</button>
+            <button style={S.iconBtn} onClick={() => navigateView('schedule')} title="Schedule TV">📋</button>
             {tab === 'schedule' && (
               <button style={S.iconBtn} onClick={() => setPrintMode(true)} title="Print">🖨️</button>
             )}
@@ -2133,7 +2143,11 @@ function TVDisplay({ data, onExit }) {
       countdown = `${m}:${s.toString().padStart(2, '0')}`;
     }
   } else if (live.status === 'upcoming') {
-    countdown = `STARTS IN ${live.minutesUntil} MIN`;
+    if (live.daysUntil != null) {
+      countdown = `${live.daysUntil} DAY${live.daysUntil !== 1 ? 'S' : ''} AWAY`;
+    } else if (live.minutesUntil != null) {
+      countdown = `STARTS IN ${live.minutesUntil} MIN`;
+    }
   }
 
   return (
@@ -2274,6 +2288,102 @@ function TVTicker({ stats, data }) {
   items.push('DREAM BIG · ATLAS SUPREME INVITATIONAL · BRING YOUR PADDLE');
   const text = items.join('   ·   ');
   return <div style={S.tvTickerText}>{text}   ·   {text}</div>;
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// TV SCHEDULE DISPLAY
+// ═══════════════════════════════════════════════════════════════════════════
+function TVScheduleDisplay({ data, onExit }) {
+  const [now, setNow] = useState(new Date());
+  useEffect(() => {
+    const id = setInterval(() => setNow(new Date()), 1000);
+    return () => clearInterval(id);
+  }, []);
+
+  const live = getLiveSlotInfo();
+  const stats = useMemo(() => computeStats(data), [data]);
+
+  return (
+    <div style={S.tvShell}>
+      <style>{globalCSS}</style>
+
+      {/* Top brand bar */}
+      <div style={S.tvBrandBar}>
+        <div style={S.tvBrandLeft}>
+          <div style={S.tvStarRow}><Star size={26} /><Star size={26} /><Star size={26} /></div>
+          <div>
+            <div style={S.tvBrandTitle}>ATLAS SUPREME</div>
+            <div style={S.tvBrandSub}>SCHEDULE · {EVENT_DATE}</div>
+          </div>
+        </div>
+        <div style={S.tvClock}>
+          {now.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', hour12: true })}
+        </div>
+        <button style={S.tvExitBtn} onClick={onExit}>✕ EXIT</button>
+      </div>
+
+      {/* Schedule slots */}
+      <div style={S.tvSchedGrid}>
+        {SCHEDULE_SLOTS.map((slot, idx) => {
+          const isLive = live.status === 'live' && live.index === idx;
+          const isPast = (live.status === 'live' && idx < live.index) || live.status === 'finished';
+          return (
+            <div key={idx} style={{
+              ...S.tvSchedSlot,
+              ...(isLive ? S.tvSchedSlotLive : {}),
+              ...(isPast ? S.tvSchedSlotPast : {}),
+            }}>
+              <div style={S.tvSchedTime}>
+                {isLive && <span style={{ ...S.tvLiveDot, marginRight: 10 }} />}
+                {slot.time}
+              </div>
+              <div style={S.tvSchedTables}>
+                {[0, 1, 2].map(i => {
+                  const mid = slot.matchIds[i];
+                  const m = mid ? data.matches[mid] : null;
+                  const t1 = m?.slots[0] ? data.teams[m.slots[0]] : null;
+                  const t2 = m?.slots[1] ? data.teams[m.slots[1]] : null;
+                  const p1a = t1?.playerIds[0] ? data.players.find(p => p.id === t1.playerIds[0]) : null;
+                  const p1b = t1?.playerIds[1] ? data.players.find(p => p.id === t1.playerIds[1]) : null;
+                  const p2a = t2?.playerIds[0] ? data.players.find(p => p.id === t2.playerIds[0]) : null;
+                  const p2b = t2?.playerIds[1] ? data.players.find(p => p.id === t2.playerIds[1]) : null;
+                  const w1 = m?.winner && m.winner === m?.slots[0];
+                  const w2 = m?.winner && m.winner === m?.slots[1];
+                  return (
+                    <div key={i} style={S.tvSchedMatch}>
+                      <div style={S.tvSchedTableNum}>TABLE {slot.tables[i]}</div>
+                      {mid && m ? (
+                        <>
+                          <div style={{ ...S.tvSchedTeam, ...(w1 ? S.tvSchedWinner : w2 ? S.tvSchedLoser : {}) }}>
+                            <span style={S.tvSchedSeed}>{t1?.seed ?? '—'}</span>
+                            <span style={S.tvSchedNames}>{p1a?.name || '—'} / {p1b?.name || '—'}</span>
+                            {w1 && <span style={S.tvSchedCheck}>✓</span>}
+                          </div>
+                          <div style={S.tvSchedVs}>VS</div>
+                          <div style={{ ...S.tvSchedTeam, ...(w2 ? S.tvSchedWinner : w1 ? S.tvSchedLoser : {}) }}>
+                            <span style={S.tvSchedSeed}>{t2?.seed ?? '—'}</span>
+                            <span style={S.tvSchedNames}>{p2a?.name || '—'} / {p2b?.name || '—'}</span>
+                            {w2 && <span style={S.tvSchedCheck}>✓</span>}
+                          </div>
+                        </>
+                      ) : (
+                        <div style={S.tvSchedEmpty}>—</div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Ticker */}
+      <div style={S.tvTickerStrip}>
+        <TVTicker stats={stats} data={data} />
+      </div>
+    </div>
+  );
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -3239,6 +3349,31 @@ const S = {
     color: T.goldBr, paddingLeft: '100%',
     animation: 'ticker 60s linear infinite',
   },
+
+  // TV Schedule display
+  tvSchedGrid: { flex: 1, display: 'flex', flexDirection: 'column', gap: 8, overflow: 'hidden', minHeight: 0 },
+  tvSchedSlot: {
+    flex: 1,
+    background: 'rgba(0,0,0,0.35)', border: `1px solid ${T.rim}`, borderRadius: 10,
+    padding: '10px 18px', display: 'flex', alignItems: 'center', gap: 20,
+  },
+  tvSchedSlotLive: { background: 'rgba(200,50,50,0.12)', borderColor: T.red },
+  tvSchedSlotPast: { opacity: 0.3 },
+  tvSchedTime: {
+    fontFamily: "'Oswald', sans-serif", fontSize: 24, fontWeight: 700, color: T.gold,
+    letterSpacing: 1, minWidth: 150, display: 'flex', alignItems: 'center',
+  },
+  tvSchedTables: { flex: 1, display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 14 },
+  tvSchedMatch: { display: 'flex', flexDirection: 'column', gap: 3 },
+  tvSchedTableNum: { fontFamily: "'Oswald', sans-serif", fontSize: 12, fontWeight: 700, letterSpacing: 2, color: T.goldBr, opacity: 0.7, marginBottom: 2 },
+  tvSchedTeam: { display: 'flex', alignItems: 'center', gap: 8 },
+  tvSchedWinner: { opacity: 1 },
+  tvSchedLoser: { opacity: 0.35 },
+  tvSchedSeed: { fontFamily: "'Oswald', sans-serif", fontSize: 22, fontWeight: 700, color: T.goldBr, minWidth: 28 },
+  tvSchedNames: { fontFamily: "'Oswald', sans-serif", fontSize: 20, fontWeight: 600, color: T.ivory, letterSpacing: 0.5, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
+  tvSchedCheck: { fontFamily: "'Oswald', sans-serif", fontSize: 18, color: T.gold, fontWeight: 700, flexShrink: 0 },
+  tvSchedVs: { fontFamily: "'Oswald', sans-serif", fontSize: 11, fontWeight: 700, color: T.gold, letterSpacing: 2, opacity: 0.6 },
+  tvSchedEmpty: { fontFamily: "'Oswald', sans-serif", fontSize: 16, color: 'rgba(245,238,220,0.2)', padding: '6px 0' },
 
   // PRINT
   printBackdrop: { position: 'fixed', inset: 0, background: '#fff', zIndex: 1000, overflowY: 'auto', padding: 20 },
