@@ -675,9 +675,7 @@ export default function App() {
                   style={data.locked ? S.lockBtnActive : S.iconBtn}
                   onClick={toggleLock}
                   title={data.locked ? 'Unlock bracket' : 'Lock bracket'}
-                >
-                  {data.locked ? '🔒' : '🔓'}
-                </button>
+                >{data.locked ? '🔒' : '🔓'}</button>
                 <button style={S.iconBtn} onClick={() => setResetMenu(true)} title="Reset">↻</button>
               </>
             )}
@@ -689,14 +687,6 @@ export default function App() {
           </div>
         </header>
 
-        {/* LOCKED BANNER */}
-        {isAdmin && data.locked && (
-          <div style={S.lockBanner}>
-            <span>🔒</span>
-            <span>BRACKET LOCKED</span>
-            <button style={S.lockBannerBtn} onClick={toggleLock}>UNLOCK</button>
-          </div>
-        )}
 
         {/* TAB BAR */}
         <nav style={S.tabBar}>
