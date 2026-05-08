@@ -217,21 +217,24 @@ function parseDurationMin(str) {
 }
 
 function fmtTime(date) {
-  return date.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', hour12: true })
-    .replace(':00', '').replace(' AM', '').replace(' PM', pm => pm);
+  return date.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', hour12: true });
+  // e.g. "4:30 PM" or "5:00 PM"
 }
 
 function getProjectedSlots(data) {
   const base = getEffectiveSlots(data);
   const actuals = data?.slotActualStarts || [];
 
-  // Build projected start times, chaining from actual starts
-  const projStart = base.map((_, i) => {
-    if (actuals[i]) return new Date(actuals[i]);
-    return null;
+  // actuals[slotIdx] = array of ISO strings per table (or null), e.g. ['2026-...', null, '2026-...']
+  // slotEarliestStart = the first table to start in each slot (drives cascade)
+  const slotEarliestStart = base.map((_, i) => {
+    const tableStarts = Array.isArray(actuals[i]) ? actuals[i] : [];
+    const valid = tableStarts.filter(Boolean).map(ts => new Date(ts).getTime());
+    return valid.length ? new Date(Math.min(...valid)) : null;
   });
 
-  // Forward-fill projections from each actual start
+  // Forward-fill projections
+  const projStart = [...slotEarliestStart];
   for (let i = 1; i < base.length; i++) {
     if (!projStart[i] && projStart[i - 1]) {
       const dur = parseDurationMin(base[i - 1].duration);
@@ -240,9 +243,10 @@ function getProjectedSlots(data) {
   }
 
   return base.map((slot, i) => {
-    const actualTs = actuals[i] ? new Date(actuals[i]) : null;
+    const tableStarts = Array.isArray(actuals[i]) ? actuals[i] : [];
+    const hasAnyActual = tableStarts.some(Boolean);
     const proj = projStart[i];
-    if (!proj) return { ...slot, projected: false, actualTs: null };
+    if (!proj) return { ...slot, projected: false, tableStarts };
 
     const dur = parseDurationMin(slot.duration);
     const endDate = new Date(proj.getTime() + dur * 60000);
@@ -250,8 +254,8 @@ function getProjectedSlots(data) {
     return {
       ...slot,
       time: timeStr,
-      projected: !actualTs,   // true = estimated, false = confirmed actual
-      actualTs,
+      projected: !hasAnyActual,
+      tableStarts,
     };
   });
 }
@@ -813,10 +817,13 @@ export default function App() {
                 next.scheduleTimes[idx] = newTime;
                 setData(next);
               }}
-              onSlotStart={(idx) => {
+              onSlotStart={(slotIdx, tableIdx) => {
                 const next = cloneData(data);
                 if (!next.slotActualStarts) next.slotActualStarts = [];
-                next.slotActualStarts[idx] = new Date().toISOString();
+                if (!Array.isArray(next.slotActualStarts[slotIdx])) {
+                  next.slotActualStarts[slotIdx] = [null, null, null];
+                }
+                next.slotActualStarts[slotIdx][tableIdx] = new Date().toISOString();
                 setData(next);
               }}
             />
@@ -1742,12 +1749,11 @@ function ScheduleView({ data, tableFilter, setTableFilter, isAdmin, onTimeEdit, 
           const isPast = (live.status === 'live' && idx < live.index) || live.status === 'finished';
           const isLive = live.status === 'live' && live.index === idx;
           const isNext = live.status === 'live' && live.index + 1 === idx;
-          const canStart = isAdmin && !slot.actualTs && (isLive || isNext || live.status === 'upcoming');
           return (
             <TimeSlot key={idx} slot={slot} slotIdx={idx} data={data} tableFilter={tableFilter}
               isLive={isLive} isPast={isPast} isNext={isNext}
               isAdmin={isAdmin} onTimeEdit={onTimeEdit}
-              canStart={canStart} onStart={() => onSlotStart(idx)} />
+              onSlotStart={onSlotStart} />
           );
         })}
       </div>
@@ -1761,10 +1767,11 @@ function ScheduleView({ data, tableFilter, setTableFilter, isAdmin, onTimeEdit, 
   );
 }
 
-function TimeSlot({ slot, slotIdx, data, tableFilter, isLive, isPast, isNext, isAdmin, onTimeEdit, canStart, onStart }) {
+function TimeSlot({ slot, slotIdx, data, tableFilter, isLive, isPast, isNext, isAdmin, onTimeEdit, onSlotStart }) {
   const [editing, setEditing] = useState(false);
   const [editVal, setEditVal] = useState(slot.time);
   const visible = tableFilter === 'all' ? [0, 1, 2] : [tableFilter - 1];
+  const canEditTime = isAdmin && !(slot.tableStarts || []).some(Boolean);
 
   const startEdit = () => { setEditVal(slot.time); setEditing(true); };
   const commitEdit = () => {
@@ -1783,43 +1790,53 @@ function TimeSlot({ slot, slotIdx, data, tableFilter, isLive, isPast, isNext, is
             onKeyDown={e => { if (e.key === 'Enter') commitEdit(); if (e.key === 'Escape') setEditing(false); }}
             style={S.slotTimeInput} />
         ) : (
-          <div style={S.slotTimeMain} onClick={isAdmin && !slot.actualTs ? startEdit : undefined}
-               title={isAdmin && !slot.actualTs ? 'Click to edit time' : undefined}>
+          <div style={S.slotTimeMain} onClick={canEditTime ? startEdit : undefined}
+               title={canEditTime ? 'Click to edit time' : undefined}>
             {slot.time}
-            {slot.projected && <span style={S.slotEstBadge}>EST</span>}
-            {isAdmin && !slot.actualTs && <span style={S.slotTimeEditHint}>✎</span>}
+            {slot.projected && <div style={S.slotEstBadge}>EST</div>}
+            {canEditTime && <span style={S.slotTimeEditHint}>✎</span>}
           </div>
-        )}
-        {slot.actualTs && (
-          <div style={S.slotActualTime}>
-            STARTED {slot.actualTs.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', hour12: true })}
-          </div>
-        )}
-        {canStart && (
-          <button style={S.slotStartBtn} onClick={onStart}>▶ START</button>
         )}
         <div style={S.slotTimeDuration}>{slot.duration}</div>
       </div>
       <div style={S.slotMatches}>
-        {visible.map((i, idx) => (
-          <SlotMatch key={i}
-            matchId={slot.matchIds[i]}
-            tableNum={slot.tables[i]}
-            data={data}
-            isLast={idx === visible.length - 1} />
-        ))}
+        {visible.map((i, idx) => {
+          const tableActualTs = slot.tableStarts?.[i] ? new Date(slot.tableStarts[i]) : null;
+          const canStart = isAdmin && !tableActualTs;
+          return (
+            <SlotMatch key={i}
+              matchId={slot.matchIds[i]}
+              tableNum={slot.tables[i]}
+              data={data}
+              isLast={idx === visible.length - 1}
+              isAdmin={isAdmin}
+              canStart={canStart}
+              actualTs={tableActualTs}
+              onStart={() => onSlotStart(slotIdx, i)} />
+          );
+        })}
       </div>
     </div>
   );
 }
 
-function SlotMatch({ matchId, tableNum, data, isLast }) {
+function SlotMatch({ matchId, tableNum, data, isLast, isAdmin, canStart, actualTs, onStart }) {
+  const borderStyle = isLast ? {} : { borderRight: `1px solid ${T.rim}` };
+
+  const startedFooter = actualTs ? (
+    <div style={S.slotTableStarted}>
+      ● {actualTs.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', hour12: true })}
+    </div>
+  ) : canStart ? (
+    <button style={S.slotStartBtn} onClick={onStart}>▶ START</button>
+  ) : null;
+
   if (!matchId) {
     return (
-      <div style={{ ...S.slotMatch, ...S.slotMatchEmpty,
-                    ...(isLast ? {} : { borderRight: `1px solid ${T.rim}` }) }}>
+      <div style={{ ...S.slotMatch, ...S.slotMatchEmpty, ...borderStyle }}>
         <div style={S.tableLabel}>{tableNum}</div>
         <div style={S.matchEmpty}>Open / Warmup</div>
+        {startedFooter}
       </div>
     );
   }
@@ -1833,7 +1850,7 @@ function SlotMatch({ matchId, tableNum, data, isLast }) {
   const complete = !!(t1 && p1a && p1b && t2 && p2a && p2b);
 
   return (
-    <div style={{ ...S.slotMatch, ...(isLast ? {} : { borderRight: `1px solid ${T.rim}` }) }}>
+    <div style={{ ...S.slotMatch, ...borderStyle }}>
       <div style={S.tableLabel}>TABLE {tableNum}</div>
       {complete ? (
         <>
@@ -1863,6 +1880,7 @@ function SlotMatch({ matchId, tableNum, data, isLast }) {
           {t1 && t2 ? 'Add players to teams' : 'Awaiting bracket'}
         </div>
       )}
+      {startedFooter}
     </div>
   );
 }
@@ -3473,32 +3491,40 @@ const S = {
   timeSlotLive: { background: 'rgba(199,72,74,0.08)', boxShadow: `inset 4px 0 0 ${T.red}` },
   timeSlotPast: { opacity: 0.45 },
   slotTime: {
-    width: 108, padding: '10px 8px',
+    width: 130, minWidth: 130, padding: '10px 8px',
     background: T.bgCard,
     borderRight: `1px solid ${T.rim}`,
-    display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 2,
+    display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 3,
     flexShrink: 0,
   },
   slotLiveBadge: {
     background: T.red, color: T.ivory,
     fontFamily: "'Oswald', sans-serif", fontSize: 9, fontWeight: 700, letterSpacing: 1.5,
-    padding: '2px 6px', borderRadius: 3, marginBottom: 4,
+    padding: '2px 6px', borderRadius: 3,
   },
   slotNextBadge: {
     background: T.gold, color: T.bgDeep,
     fontFamily: "'Oswald', sans-serif", fontSize: 9, fontWeight: 700, letterSpacing: 1.5,
-    padding: '2px 6px', borderRadius: 3, marginBottom: 4,
+    padding: '2px 6px', borderRadius: 3,
   },
   slotTimeMain: {
     fontFamily: "'Oswald', sans-serif", fontSize: 11, fontWeight: 700, letterSpacing: 0.5,
-    color: T.gold, textAlign: 'center', lineHeight: 1.2, whiteSpace: 'nowrap',
+    color: T.gold, textAlign: 'center', lineHeight: 1.3,
+    display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2,
   },
   slotTimeDuration: { fontFamily: "'Barlow Condensed', sans-serif", fontSize: 10, color: 'rgba(245,238,220,0.5)' },
   slotTimeEditHint: { marginLeft: 4, fontSize: 9, opacity: 0.5, cursor: 'pointer' },
-  slotEstBadge: { marginLeft: 5, fontSize: 8, fontWeight: 700, letterSpacing: 1, color: '#e8a020', background: 'rgba(232,160,32,0.15)', border: '1px solid rgba(232,160,32,0.4)', borderRadius: 3, padding: '1px 4px', verticalAlign: 'middle' },
-  slotActualTime: { fontFamily: "'Barlow Condensed', sans-serif", fontSize: 9, color: T.gold, letterSpacing: 0.5, marginTop: 2 },
+  slotEstBadge: {
+    display: 'inline-block', fontSize: 8, fontWeight: 700, letterSpacing: 1,
+    color: '#e8a020', background: 'rgba(232,160,32,0.15)', border: '1px solid rgba(232,160,32,0.4)',
+    borderRadius: 3, padding: '1px 4px',
+  },
+  slotTableStarted: {
+    fontFamily: "'Barlow Condensed', sans-serif", fontSize: 10, color: T.gold,
+    letterSpacing: 0.5, marginTop: 'auto', paddingTop: 6, textAlign: 'center',
+  },
   slotStartBtn: {
-    marginTop: 4, width: '100%', padding: '5px 0',
+    marginTop: 'auto', width: '90%', padding: '5px 0',
     background: 'rgba(212,165,75,0.2)', border: `1px solid ${T.gold}`, borderRadius: 4,
     color: T.gold, fontFamily: "'Oswald', sans-serif", fontSize: 10, fontWeight: 700, letterSpacing: 1.5,
     cursor: 'pointer',
@@ -3506,10 +3532,10 @@ const S = {
   slotTimeInput: {
     fontFamily: "'Oswald', sans-serif", fontSize: 11, fontWeight: 700, letterSpacing: 0.5,
     color: T.gold, background: 'rgba(212,165,75,0.12)', border: `1px solid ${T.gold}`,
-    borderRadius: 4, padding: '2px 4px', width: 90, textAlign: 'center', outline: 'none',
+    borderRadius: 4, padding: '2px 4px', width: 108, textAlign: 'center', outline: 'none',
   },
   slotMatches: { flex: 1, display: 'flex', background: T.bgCard },
-  slotMatch: { flex: 1, padding: 10, display: 'flex', flexDirection: 'column', gap: 4, alignItems: 'center', justifyContent: 'center' },
+  slotMatch: { flex: 1, padding: 10, display: 'flex', flexDirection: 'column', gap: 4, alignItems: 'center', justifyContent: 'flex-start', paddingTop: 12 },
   slotMatchEmpty: { background: 'rgba(255,255,255,0.03)' },
   tableLabel: { fontFamily: "'Oswald', sans-serif", fontSize: 10, fontWeight: 700, letterSpacing: 1.5, color: T.gold },
   matchEmpty: { fontFamily: "'Barlow Condensed', sans-serif", fontSize: 11, color: 'rgba(245,238,220,0.5)', fontStyle: 'italic' },
