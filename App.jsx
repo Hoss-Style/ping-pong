@@ -2315,6 +2315,7 @@ function ScoreEditor({ data, matchId, onClose, onSave, onForfeit }) {
                   </div>
                   <input type="number" min="0" max="30" value={game[0]}
                     onChange={e => setScore(i, 0, e.target.value)}
+                    onFocus={e => e.target.select()}
                     style={S.scoreInput} />
                   {i === 0 && t1Wins > t2Wins && <div style={S.scoreWinTag}>WIN</div>}
                 </div>
@@ -2327,6 +2328,7 @@ function ScoreEditor({ data, matchId, onClose, onSave, onForfeit }) {
                   </div>
                   <input type="number" min="0" max="30" value={game[1]}
                     onChange={e => setScore(i, 1, e.target.value)}
+                    onFocus={e => e.target.select()}
                     style={S.scoreInput} />
                   {i === 0 && t2Wins > t1Wins && <div style={S.scoreWinTag}>WIN</div>}
                 </div>
