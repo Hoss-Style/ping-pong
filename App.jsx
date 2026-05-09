@@ -17,26 +17,28 @@ const ROOM_ID = 'atlas-supreme-invitational';
 const STORAGE_KEY = 'atlas-supreme-final-v1';
 
 // ═══ DESIGN TOKENS ═════════════════════════════════════════════════════════
+// Brand guide: Atlas Green #2E5B4E · Atlas Orange #F2A23A · Cream #F6F4EF
 const T = {
-  // Marty Supreme cinematic palette
-  bgDeep:  '#04120E',
-  bg:      '#0A2620',
-  bgMid:   '#0E382E',
-  bgCard:  '#0E342B',
-  bgSoft:  '#143E33',
+  bgDeep:  '#0B1E17',
+  bg:      '#162E24',
+  bgMid:   '#1E3D30',
+  bgCard:  '#1A3A2C',
+  bgSoft:  '#2E5B4E',   // Atlas Green
 
-  goldDark: '#8A5F20',
-  gold:     '#D4A54B',
-  goldBr:   '#F5C86E',
-  goldGlow: '#FFDC8C',
+  goldDark: '#B5761E',
+  gold:     '#F2A23A',  // Atlas Orange
+  goldBr:   '#FFBC5C',
+  goldGlow: '#FFD080',
 
-  ivory:    '#F5EEDC',
-  ivoryDim: '#C8C0AF',
-  parchment:'#DAC69E',
+  ivory:    '#F6F4EF',  // Brand Cream
+  ivoryDim: '#C5C2BA',
+  parchment:'#E8E3D8',
+
+  sage:     '#6F8B81',  // Brand Sage
 
   red:      '#C7484A',
-  rim:      'rgba(212,165,75,0.30)',
-  rimSoft:  'rgba(212,165,75,0.14)',
+  rim:      'rgba(242,162,58,0.28)',
+  rimSoft:  'rgba(242,162,58,0.12)',
 };
 
 // ═══ DATA MODEL ════════════════════════════════════════════════════════════
@@ -391,6 +393,198 @@ function useIsDesktop() {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
+// LANDING PAGE
+// ═══════════════════════════════════════════════════════════════════════════
+function LandingPage({ onEnter }) {
+  const [visible, setVisible] = useState(false);
+  useEffect(() => { requestAnimationFrame(() => setVisible(true)); }, []);
+
+  const handleEnter = (tab) => {
+    sessionStorage.setItem('atlas-seen-landing', '1');
+    onEnter(tab);
+  };
+
+  return (
+    <div style={{
+      position: 'fixed', inset: 0, background: T.bgDeep,
+      display: 'flex', flexDirection: 'column',
+      overflow: 'hidden',
+    }}>
+      <style>{`
+        @keyframes landingFadeUp {
+          from { opacity: 0; transform: translateY(24px); }
+          to   { opacity: 1; transform: translateY(0); }
+        }
+        @keyframes heroScale {
+          from { transform: scale(1.06); }
+          to   { transform: scale(1); }
+        }
+        .landing-hero-img {
+          animation: heroScale 1.4s cubic-bezier(0.22,1,0.36,1) forwards;
+        }
+        .landing-cta:hover {
+          background: #FFBC5C !important;
+          transform: translateY(-2px);
+          box-shadow: 0 8px 32px rgba(242,162,58,0.5) !important;
+        }
+        .landing-cta:active { transform: scale(0.97) !important; }
+        .landing-bracket-btn:hover { background: rgba(242,162,58,0.15) !important; }
+      `}</style>
+
+      {/* Hero image — full bleed */}
+      <div style={{
+        position: 'absolute', inset: 0, overflow: 'hidden',
+      }}>
+        <img
+          className="landing-hero-img"
+          src="/hero.png"
+          alt=""
+          style={{
+            width: '100%', height: '100%',
+            objectFit: 'cover', objectPosition: 'center top',
+            display: 'block',
+          }}
+        />
+        {/* gradient overlay: dark bottom + left dark panel on desktop */}
+        <div style={{
+          position: 'absolute', inset: 0,
+          background: `
+            linear-gradient(to top,  rgba(11,30,23,0.97) 0%, rgba(11,30,23,0.7) 38%, rgba(11,30,23,0.0) 65%),
+            linear-gradient(to right, rgba(11,30,23,0.88) 0%, rgba(11,30,23,0.4) 48%, rgba(11,30,23,0.0) 70%)
+          `,
+        }} />
+      </div>
+
+      {/* Content panel — bottom-left anchored */}
+      <div style={{
+        position: 'absolute', bottom: 0, left: 0, right: 0,
+        padding: '0 28px 48px 28px',
+        display: 'flex', flexDirection: 'column', alignItems: 'flex-start',
+        opacity: visible ? 1 : 0,
+        transition: 'opacity 0.6s ease',
+      }}>
+        {/* Stars */}
+        <div style={{
+          display: 'flex', gap: 8, marginBottom: 14,
+          animation: 'landingFadeUp 0.7s 0.1s both',
+        }}>
+          {[0,1,2].map(i => (
+            <svg key={i} width="16" height="16" viewBox="0 0 16 16" fill={T.gold}>
+              <polygon points="8,1 10,6 15,6 11,9.5 12.5,15 8,12 3.5,15 5,9.5 1,6 6,6"/>
+            </svg>
+          ))}
+        </div>
+
+        {/* Event name */}
+        <div style={{
+          fontFamily: 'Oswald, sans-serif', fontWeight: 700,
+          fontSize: 'clamp(36px, 10vw, 72px)',
+          lineHeight: 0.9, letterSpacing: '-0.5px',
+          color: T.ivory,
+          marginBottom: 8,
+          animation: 'landingFadeUp 0.7s 0.2s both',
+        }}>
+          ATLAS<br />
+          <span style={{ color: T.gold }}>SUPREME</span>
+        </div>
+        <div style={{
+          fontFamily: 'Barlow Condensed, sans-serif', fontWeight: 600,
+          fontSize: 'clamp(14px, 4vw, 20px)',
+          letterSpacing: 5, color: T.sage,
+          marginBottom: 4,
+          animation: 'landingFadeUp 0.7s 0.28s both',
+        }}>
+          INVITATIONAL
+        </div>
+        <div style={{
+          fontFamily: 'Barlow Condensed, sans-serif', fontWeight: 500,
+          fontSize: 'clamp(11px, 3vw, 14px)',
+          letterSpacing: 3, color: T.ivoryDim,
+          marginBottom: 36,
+          animation: 'landingFadeUp 0.7s 0.34s both',
+        }}>
+          18 TEAMS · 36 PLAYERS · MAY 14, 2026
+        </div>
+
+        {/* Divider */}
+        <div style={{
+          width: 56, height: 2, background: T.gold, marginBottom: 32,
+          animation: 'landingFadeUp 0.7s 0.38s both',
+        }} />
+
+        {/* Dream big tagline */}
+        <div style={{
+          fontFamily: 'Courier Prime, monospace', fontStyle: 'italic',
+          fontSize: 'clamp(13px, 3.5vw, 18px)',
+          color: T.ivoryDim, letterSpacing: 1,
+          marginBottom: 40,
+          animation: 'landingFadeUp 0.7s 0.42s both',
+        }}>
+          "DREAM BIG"
+        </div>
+
+        {/* CTA buttons */}
+        <div style={{
+          display: 'flex', gap: 12, flexWrap: 'wrap',
+          animation: 'landingFadeUp 0.7s 0.5s both',
+        }}>
+          <button
+            className="landing-cta"
+            onClick={() => handleEnter('bracket')}
+            style={{
+              background: T.gold, color: T.bgDeep,
+              border: 'none', borderRadius: 6,
+              fontFamily: 'Oswald, sans-serif', fontWeight: 700,
+              fontSize: 16, letterSpacing: 2,
+              padding: '14px 32px',
+              cursor: 'pointer',
+              boxShadow: `0 4px 20px rgba(242,162,58,0.35)`,
+              transition: 'all 0.18s ease',
+            }}
+          >
+            VIEW BRACKET →
+          </button>
+          <button
+            className="landing-bracket-btn"
+            onClick={() => handleEnter('schedule')}
+            style={{
+              background: 'rgba(242,162,58,0.08)',
+              color: T.gold,
+              border: `1px solid ${T.rim}`,
+              borderRadius: 6,
+              fontFamily: 'Oswald, sans-serif', fontWeight: 600,
+              fontSize: 14, letterSpacing: 2,
+              padding: '14px 24px',
+              cursor: 'pointer',
+              transition: 'all 0.18s ease',
+            }}
+          >
+            SCHEDULE
+          </button>
+        </div>
+      </div>
+
+      {/* Top-right badge */}
+      <div style={{
+        position: 'absolute', top: 20, right: 20,
+        opacity: visible ? 1 : 0, transition: 'opacity 0.8s 0.4s ease',
+      }}>
+        <div style={{
+          background: 'rgba(11,30,23,0.7)',
+          border: `1px solid ${T.rim}`,
+          borderRadius: 8, padding: '6px 14px',
+          fontFamily: 'Oswald, sans-serif', fontSize: 11,
+          letterSpacing: 2, color: T.gold,
+          backdropFilter: 'blur(8px)',
+        }}>
+          PING PONG TOURNAMENT
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
 // ROOT APP
 // ═══════════════════════════════════════════════════════════════════════════
 export default function App() {
@@ -408,6 +602,9 @@ export default function App() {
   const [tableFilter, setTableFilter] = useState('all');
   const [urlView, setUrlView] = useState(() => new URLSearchParams(window.location.search).get('view') || '');
   const [printMode, setPrintMode] = useState(false);
+  const [showLanding, setShowLanding] = useState(
+    () => !sessionStorage.getItem('atlas-seen-landing') && !new URLSearchParams(window.location.search).get('view')
+  );
 
   const navigateView = (view) => {
     const url = view ? `?view=${view}` : window.location.pathname;
@@ -743,6 +940,16 @@ export default function App() {
   }, [data]);
 
   const champion = data.matches.FINAL?.winner ? data.teams[data.matches.FINAL.winner] : null;
+
+  // Landing page
+  if (showLanding) {
+    return (
+      <>
+        <style>{globalCSS}</style>
+        <LandingPage onEnter={(tab) => { setTab(tab || 'bracket'); setShowLanding(false); }} />
+      </>
+    );
+  }
 
   // URL-based view routing
   if (urlView === 'bracket') {
