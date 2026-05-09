@@ -2289,49 +2289,45 @@ function ScoreEditor({ data, matchId, onClose, onSave, onForfeit }) {
         </div>
 
         <div style={S.scoreBody}>
-          {games.map((game, i) => (
-            <div key={i} style={S.scoreGameRow}>
-              {numGames > 1 && <div style={S.gameLabel}>GAME {i + 1}</div>}
-              <div style={S.scoreGameInputs}>
-                <div style={S.scoreTeamCol}>
-                  <div style={S.scoreTeamSeed}>{team1.side}{team1.seed}</div>
-                  <div style={S.scoreTeamPlayers}>
-                    <div>{p1a?.name || '...'}</div>
-                    <div>{p1b?.name || '...'}</div>
-                  </div>
-                  <input type="number" min="0" max="30" value={game[0]}
-                    onChange={e => setScore(i, 0, e.target.value)}
-                    onFocus={e => e.target.select()}
-                    style={S.scoreInput} />
-                  {i === 0 && t1Wins > t2Wins && <div style={S.scoreWinTag}>WIN</div>}
-                </div>
-                <div style={S.scoreSep}>—</div>
-                <div style={S.scoreTeamCol}>
-                  <div style={S.scoreTeamSeed}>{team2.side}{team2.seed}</div>
-                  <div style={S.scoreTeamPlayers}>
-                    <div>{p2a?.name || '...'}</div>
-                    <div>{p2b?.name || '...'}</div>
-                  </div>
-                  <input type="number" min="0" max="30" value={game[1]}
-                    onChange={e => setScore(i, 1, e.target.value)}
-                    onFocus={e => e.target.select()}
-                    style={S.scoreInput} />
-                  {i === 0 && t2Wins > t1Wins && <div style={S.scoreWinTag}>WIN</div>}
+          {games.map((game, i) => {
+            const t1Win = game[0] > game[1];
+            const t2Win = game[1] > game[0];
+            return (
+              <div key={i}>
+                {numGames > 1 && <div style={S.gameLabel}>GAME {i + 1}</div>}
+                <div style={S.scoreGameInputs}>
+                  {[
+                    { team: team1, pa: p1a, pb: p1b, val: game[0], idx: 0, isWin: t1Win },
+                    { team: team2, pa: p2a, pb: p2b, val: game[1], idx: 1, isWin: t2Win },
+                  ].map(({ team, pa, pb, val, idx, isWin }) => (
+                    <div key={idx} style={{
+                      ...S.scoreTeamCol,
+                      ...(isWin ? S.scoreTeamColWin : {}),
+                    }}>
+                      <div style={S.scoreTeamSeed}>{team.side}{team.seed}</div>
+                      <div style={S.scoreTeamPlayers}>
+                        <div>{pa?.name || '…'}</div>
+                        <div style={{ opacity: 0.7 }}>{pb?.name || '…'}</div>
+                      </div>
+                      <input type="number" min="0" max="30" value={val}
+                        onChange={e => setScore(i, idx, e.target.value)}
+                        onFocus={e => e.target.select()}
+                        style={{ ...S.scoreInput, ...(isWin ? S.scoreInputWin : {}) }} />
+                      {isWin && <div style={S.scoreWinTag}>WIN</div>}
+                    </div>
+                  ))}
                 </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
 
-        {winner && (
-          <div style={S.scoreWinnerBanner}>
-            {winner === 1 ? `${team1.side}${team1.seed}` : `${team2.side}${team2.seed}`} WINS
-            {isFinal && ' THE TITLE'}
-          </div>
-        )}
-
         <div style={S.scoreActions}>
-          <button style={S.scoreSaveBtn} onClick={handleSave}>✓ SAVE SCORES</button>
+          <button style={S.scoreSaveBtn} onClick={handleSave}>
+            {winner
+              ? `✓ SAVE · ${winner === 1 ? team1.side + team1.seed : team2.side + team2.seed} WINS${isFinal ? ' THE TITLE' : ''}`
+              : '✓ SAVE SCORES'}
+          </button>
           <button style={S.modalCancel} onClick={onClose}>CANCEL</button>
         </div>
       </div>
@@ -3804,39 +3800,40 @@ const S = {
     color: 'rgba(245,238,220,0.7)', marginTop: 2,
   },
   scoreBody: { padding: '16px 20px', display: 'flex', flexDirection: 'column', gap: 16 },
-  scoreGameRow: { display: 'flex', flexDirection: 'column', gap: 8 },
   gameLabel: {
     fontFamily: "'Oswald', sans-serif", fontSize: 10, fontWeight: 700, letterSpacing: 2,
-    color: T.gold, textAlign: 'center',
+    color: T.gold, textAlign: 'center', marginBottom: 8,
   },
-  scoreGameInputs: { display: 'flex', alignItems: 'center', gap: 12 },
+  scoreGameInputs: { display: 'flex', gap: 10 },
   scoreTeamCol: {
-    flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6,
-    padding: 12, background: 'rgba(212,165,75,0.04)', border: `1px solid ${T.rim}`, borderRadius: 6,
+    flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8,
+    padding: '14px 10px 10px',
+    background: 'rgba(255,255,255,0.03)', border: `1px solid ${T.rim}`, borderRadius: 8,
+    transition: 'border-color 0.15s, background 0.15s',
+  },
+  scoreTeamColWin: {
+    background: 'rgba(212,165,75,0.08)', border: `1px solid ${T.gold}`,
   },
   scoreTeamSeed: {
-    fontFamily: "'Oswald', sans-serif", fontSize: 13, fontWeight: 700, color: T.goldBr,
-    background: 'rgba(212,165,75,0.18)', borderRadius: 4, padding: '2px 8px',
+    fontFamily: "'Oswald', sans-serif", fontSize: 12, fontWeight: 700, color: T.goldBr,
+    background: 'rgba(212,165,75,0.18)', borderRadius: 4, padding: '2px 8px', letterSpacing: 1,
   },
   scoreTeamPlayers: {
-    fontFamily: "'Oswald', sans-serif", fontSize: 11, color: T.ivory, lineHeight: 1.3, textAlign: 'center',
+    fontFamily: "'Oswald', sans-serif", fontSize: 12, color: T.ivory,
+    lineHeight: 1.4, textAlign: 'center', letterSpacing: 0.3,
   },
   scoreInput: {
-    width: '100%', padding: '10px 0',
-    background: 'rgba(0,0,0,0.4)', border: `1px solid ${T.rim}`, borderRadius: 4,
+    width: '100%', padding: '12px 0',
+    background: 'rgba(0,0,0,0.3)', border: `1px solid rgba(212,165,75,0.2)`, borderRadius: 6,
     color: T.ivory,
-    fontFamily: "'Oswald', sans-serif", fontSize: 28, fontWeight: 700, textAlign: 'center', outline: 'none',
+    fontFamily: "'Oswald', sans-serif", fontSize: 36, fontWeight: 700, textAlign: 'center', outline: 'none',
+  },
+  scoreInputWin: {
+    color: T.goldBr, border: `1px solid rgba(212,165,75,0.5)`,
   },
   scoreWinTag: {
-    fontFamily: "'Oswald', sans-serif", fontSize: 10, fontWeight: 700, letterSpacing: 1.5,
-    color: T.bgDeep, background: T.gold, borderRadius: 3, padding: '2px 8px',
-  },
-  scoreSep: { color: T.gold, fontWeight: 700, fontSize: 20, flexShrink: 0 },
-  scoreWinnerBanner: {
-    padding: '12px 16px', margin: '0 20px',
-    background: 'rgba(212,165,75,0.18)', border: `1px solid ${T.gold}`,
-    color: T.goldBr,
-    fontFamily: "'Oswald', sans-serif", fontSize: 13, fontWeight: 700, textAlign: 'center', letterSpacing: 2,
+    fontFamily: "'Oswald', sans-serif", fontSize: 9, fontWeight: 700, letterSpacing: 2,
+    color: T.bgDeep, background: T.gold, borderRadius: 3, padding: '2px 10px',
   },
   scoreActions: { display: 'flex', flexDirection: 'column', gap: 8, padding: '16px 20px', borderTop: `1px solid ${T.rim}` },
   scoreSaveBtn: {
