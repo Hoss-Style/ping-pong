@@ -820,7 +820,7 @@ export default function App() {
           {tab === 'bracket' && (isDesktop ? (
             <DesktopBracketView
               data={data}
-              onTeamTap={isAdmin ? advanceWinner : undefined}
+              onTeamTap={isAdmin ? (matchId) => setScoreEditor({ matchId }) : undefined}
               onScoreEdit={isAdmin ? setScoreEditor : undefined}
               onShareMatch={setShareCard}
               locked={data.locked || !isAdmin}
@@ -830,7 +830,7 @@ export default function App() {
               data={data}
               activeRound={activeRound}
               setActiveRound={setActiveRound}
-              onTeamTap={isAdmin ? advanceWinner : undefined}
+              onTeamTap={isAdmin ? (matchId) => setScoreEditor({ matchId }) : undefined}
               onSlotTap={isAdmin ? (teamId, slotIndex) => setPicker({ teamId, slotIndex }) : undefined}
               onRemovePlayer={isAdmin ? removePlayer : undefined}
               editTeamMode={editTeamMode}
@@ -1111,7 +1111,6 @@ function MatchCard({ matchId, match, data, onTeamTap, onSlotTap, onRemovePlayer,
       <div style={S.vsRow}>
         <div style={S.vsLine} />
         <div style={S.vsLabel}>VS</div>
-        <button style={S.scoreButton} onClick={onScoreEdit} disabled={locked}>📊 SCORE</button>
         {match.winner && (
           <button style={S.shareButton} onClick={onShareMatch}>📤</button>
         )}
@@ -1646,11 +1645,6 @@ function DesktopMatchCard({ matchId, data, onTeamTap, onScoreEdit, onShareMatch,
       <div style={{ ...S.dmcHeader, ...(isFinalCard ? { background: T.goldDark, borderBottom: `1px solid ${T.gold}` } : {}) }}>
         <span style={{ ...S.dmcLabel, ...(isFinalCard ? { color: T.goldGlow, fontSize: 11, letterSpacing: 1.5 } : {}) }}>{shortLabel}</span>
         <div style={S.dmcBtns}>
-          {!locked && onScoreEdit && (
-            <button style={S.dmcBtn}
-              onClick={e => { e.stopPropagation(); onScoreEdit({ matchId }); }}
-              title="Enter scores">📊</button>
-          )}
           {match.winner && onShareMatch && (
             <button style={S.dmcBtn}
               onClick={e => { e.stopPropagation(); onShareMatch({ matchId }); }}
