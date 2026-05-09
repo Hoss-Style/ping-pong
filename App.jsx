@@ -2309,8 +2309,8 @@ function ScoreEditor({ data, matchId, onClose, onSave, onForfeit }) {
                         <div>{pa?.name || '…'}</div>
                         <div style={{ opacity: 0.7 }}>{pb?.name || '…'}</div>
                       </div>
-                      <input type="number" min="0" max="30" value={val}
-                        onChange={e => setScore(i, idx, e.target.value)}
+                      <input type="text" inputMode="numeric" pattern="[0-9]*" value={val}
+                        onChange={e => setScore(i, idx, e.target.value.replace(/\D/g, ''))}
                         onFocus={e => e.target.select()}
                         style={{ ...S.scoreInput, ...(isWin ? S.scoreInputWin : {}) }} />
                       {isWin && <div style={S.scoreWinTag}>WIN</div>}
