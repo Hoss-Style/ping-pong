@@ -2259,31 +2259,22 @@ function ScoreEditor({ data, matchId, onClose, onSave, onForfeit }) {
   const numGames = isFinal ? 3 : 1;
   const formatLabel = isFinal ? 'BEST OF 3 TO 21' : '1 GAME TO 21';
 
-  const [scores, setScores] = useState(() => {
+  // games[i] = [t1_score, t2_score]
+  const [games, setGames] = useState(() => {
     if (match.scores.team1.length > 0) {
-      return { t1: match.scores.team1, t2: match.scores.team2 };
+      return match.scores.team1.map((g, i) => [g[0], match.scores.team2[i]?.[1] ?? g[1]]);
     }
-    return {
-      t1: Array.from({ length: numGames }, () => [0, 0]),
-      t2: Array.from({ length: numGames }, () => [0, 0]),
-    };
+    return Array.from({ length: numGames }, () => [0, 0]);
   });
 
-  const handleChange = (teamIdx, gameIdx, pointIdx, val) => {
-    setScores(prev => {
-      const k = teamIdx === 0 ? 't1' : 't2';
-      const next = { ...prev, [k]: prev[k].slice() };
-      const game = next[k][gameIdx];
-      next[k][gameIdx] = [
-        pointIdx === 0 ? parseInt(val) || 0 : game[0],
-        pointIdx === 1 ? parseInt(val) || 0 : game[1],
-      ];
-      return next;
-    });
+  const setScore = (gameIdx, teamIdx, val) => {
+    setGames(prev => prev.map((g, i) =>
+      i !== gameIdx ? g : teamIdx === 0 ? [parseInt(val) || 0, g[1]] : [g[0], parseInt(val) || 0]
+    ));
   };
 
-  const t1Wins = scores.t1.filter(s => s[0] > s[1]).length;
-  const t2Wins = scores.t2.filter(s => s[0] < s[1]).length;
+  const t1Wins = games.filter(g => g[0] > g[1]).length;
+  const t2Wins = games.filter(g => g[1] > g[0]).length;
   const winner = t1Wins > t2Wins ? 1 : t2Wins > t1Wins ? 2 : null;
 
   if (!team1 || !team2) return null;
@@ -2292,6 +2283,13 @@ function ScoreEditor({ data, matchId, onClose, onSave, onForfeit }) {
   const p1b = team1.playerIds[1] ? data.players.find(p => p.id === team1.playerIds[1]) : null;
   const p2a = team2.playerIds[0] ? data.players.find(p => p.id === team2.playerIds[0]) : null;
   const p2b = team2.playerIds[1] ? data.players.find(p => p.id === team2.playerIds[1]) : null;
+
+  const handleSave = () => {
+    // Convert back to the [t1_pts, t2_pts] per-team format saveScores expects
+    const t1Scores = games.map(g => [g[0], g[1]]);
+    const t2Scores = games.map(g => [g[0], g[1]]);
+    onSave(matchId, t1Scores, t2Scores);
+  };
 
   return (
     <div style={S.modalBackdrop} onClick={onClose}>
@@ -2305,34 +2303,33 @@ function ScoreEditor({ data, matchId, onClose, onSave, onForfeit }) {
         </div>
 
         <div style={S.scoreBody}>
-          {[
-            { team: team1, p1: p1a, p2: p1b, scores: scores.t1, key: 0, wins: t1Wins },
-            { team: team2, p1: p2a, p2: p2b, scores: scores.t2, key: 1, wins: t2Wins },
-          ].map(({ team, p1, p2, scores: s, key, wins }) => (
-            <div key={key} style={S.scoreTeamBlock}>
-              <div style={S.scoreTeamName}>
-                <div style={S.scoreTeamSeed}>{team.side}{team.seed}</div>
-                <div style={S.scoreTeamPlayers}>
-                  <div>{p1?.name || '...'}</div>
-                  <div>{p2?.name || '...'}</div>
-                </div>
-              </div>
-              <div style={S.scoreGames}>
-                {s.map((game, i) => (
-                  <div key={i} style={S.scoreGame}>
-                    {numGames > 1 && <div style={S.gameLabel}>G{i + 1}</div>}
-                    <input type="number" min="0" max="30" value={game[0]}
-                      onChange={e => handleChange(key, i, 0, e.target.value)}
-                      style={S.scoreInput} />
-                    <div style={S.scoreSep}>–</div>
-                    <input type="number" min="0" max="30" value={game[1]}
-                      onChange={e => handleChange(key, i, 1, e.target.value)}
-                      style={S.scoreInput} />
+          {games.map((game, i) => (
+            <div key={i} style={S.scoreGameRow}>
+              {numGames > 1 && <div style={S.gameLabel}>GAME {i + 1}</div>}
+              <div style={S.scoreGameInputs}>
+                <div style={S.scoreTeamCol}>
+                  <div style={S.scoreTeamSeed}>{team1.side}{team1.seed}</div>
+                  <div style={S.scoreTeamPlayers}>
+                    <div>{p1a?.name || '...'}</div>
+                    <div>{p1b?.name || '...'}</div>
                   </div>
-                ))}
-              </div>
-              <div style={S.scoreWins}>
-                {isFinal ? `${wins} GAMES` : (wins > 0 ? 'WIN' : '—')}
+                  <input type="number" min="0" max="30" value={game[0]}
+                    onChange={e => setScore(i, 0, e.target.value)}
+                    style={S.scoreInput} />
+                  {i === 0 && t1Wins > t2Wins && <div style={S.scoreWinTag}>WIN</div>}
+                </div>
+                <div style={S.scoreSep}>—</div>
+                <div style={S.scoreTeamCol}>
+                  <div style={S.scoreTeamSeed}>{team2.side}{team2.seed}</div>
+                  <div style={S.scoreTeamPlayers}>
+                    <div>{p2a?.name || '...'}</div>
+                    <div>{p2b?.name || '...'}</div>
+                  </div>
+                  <input type="number" min="0" max="30" value={game[1]}
+                    onChange={e => setScore(i, 1, e.target.value)}
+                    style={S.scoreInput} />
+                  {i === 0 && t2Wins > t1Wins && <div style={S.scoreWinTag}>WIN</div>}
+                </div>
               </div>
             </div>
           ))}
@@ -2346,17 +2343,7 @@ function ScoreEditor({ data, matchId, onClose, onSave, onForfeit }) {
         )}
 
         <div style={S.scoreActions}>
-          <button style={S.scoreSaveBtn} onClick={() => onSave(matchId, scores.t1, scores.t2)}>
-            ✓ SAVE SCORES
-          </button>
-          <div style={S.forfeitRow}>
-            <button style={S.forfeitBtn} onClick={() => onForfeit(matchId, team1.id)}>
-              ⊘ {team1.side}{team1.seed} FORFEIT
-            </button>
-            <button style={S.forfeitBtn} onClick={() => onForfeit(matchId, team2.id)}>
-              ⊘ {team2.side}{team2.seed} FORFEIT
-            </button>
-          </div>
+          <button style={S.scoreSaveBtn} onClick={handleSave}>✓ SAVE SCORES</button>
           <button style={S.modalCancel} onClick={onClose}>CANCEL</button>
         </div>
       </div>
@@ -3829,36 +3816,34 @@ const S = {
     color: 'rgba(245,238,220,0.7)', marginTop: 2,
   },
   scoreBody: { padding: '16px 20px', display: 'flex', flexDirection: 'column', gap: 16 },
-  scoreTeamBlock: {
-    display: 'flex', flexDirection: 'column', gap: 12,
-    padding: 12,
-    background: 'rgba(212,165,75,0.04)',
-    border: `1px solid ${T.rim}`, borderRadius: 6,
+  scoreGameRow: { display: 'flex', flexDirection: 'column', gap: 8 },
+  gameLabel: {
+    fontFamily: "'Oswald', sans-serif", fontSize: 10, fontWeight: 700, letterSpacing: 2,
+    color: T.gold, textAlign: 'center',
   },
-  scoreTeamName: { display: 'flex', gap: 10, alignItems: 'center' },
+  scoreGameInputs: { display: 'flex', alignItems: 'center', gap: 12 },
+  scoreTeamCol: {
+    flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6,
+    padding: 12, background: 'rgba(212,165,75,0.04)', border: `1px solid ${T.rim}`, borderRadius: 6,
+  },
   scoreTeamSeed: {
-    fontFamily: "'Oswald', sans-serif", fontSize: 16, fontWeight: 700, color: T.goldBr,
-    minWidth: 36, textAlign: 'center',
-    background: 'rgba(212,165,75,0.18)', borderRadius: 4, padding: '4px 8px',
+    fontFamily: "'Oswald', sans-serif", fontSize: 13, fontWeight: 700, color: T.goldBr,
+    background: 'rgba(212,165,75,0.18)', borderRadius: 4, padding: '2px 8px',
   },
   scoreTeamPlayers: {
-    fontFamily: "'Oswald', sans-serif", fontSize: 13, color: T.ivory, lineHeight: 1.3,
+    fontFamily: "'Oswald', sans-serif", fontSize: 11, color: T.ivory, lineHeight: 1.3, textAlign: 'center',
   },
-  scoreGames: { display: 'flex', flexDirection: 'column', gap: 8 },
-  scoreGame: { display: 'flex', alignItems: 'center', gap: 6 },
-  gameLabel: { fontFamily: "'Oswald', sans-serif", fontSize: 10, fontWeight: 700, color: T.gold, minWidth: 20 },
   scoreInput: {
-    flex: 1, padding: 10,
+    width: '100%', padding: '10px 0',
     background: 'rgba(0,0,0,0.4)', border: `1px solid ${T.rim}`, borderRadius: 4,
     color: T.ivory,
-    fontFamily: "'Oswald', sans-serif", fontSize: 18, fontWeight: 700, textAlign: 'center', outline: 'none',
+    fontFamily: "'Oswald', sans-serif", fontSize: 28, fontWeight: 700, textAlign: 'center', outline: 'none',
   },
-  scoreSep: { color: T.gold, fontWeight: 700, fontSize: 16 },
-  scoreWins: {
-    fontFamily: "'Oswald', sans-serif", fontSize: 11, fontWeight: 700,
-    color: T.goldBr, textAlign: 'center',
-    background: 'rgba(212,165,75,0.14)', padding: 4, borderRadius: 4, letterSpacing: 1.5,
+  scoreWinTag: {
+    fontFamily: "'Oswald', sans-serif", fontSize: 10, fontWeight: 700, letterSpacing: 1.5,
+    color: T.bgDeep, background: T.gold, borderRadius: 3, padding: '2px 8px',
   },
+  scoreSep: { color: T.gold, fontWeight: 700, fontSize: 20, flexShrink: 0 },
   scoreWinnerBanner: {
     padding: '12px 16px', margin: '0 20px',
     background: 'rgba(212,165,75,0.18)', border: `1px solid ${T.gold}`,
@@ -3870,13 +3855,6 @@ const S = {
     background: T.gold, color: T.bgDeep, border: 'none',
     borderRadius: 6, padding: '12px 14px', cursor: 'pointer',
     fontFamily: "'Oswald', sans-serif", fontSize: 12, fontWeight: 700, letterSpacing: 1.5,
-  },
-  forfeitRow: { display: 'flex', gap: 8 },
-  forfeitBtn: {
-    flex: 1,
-    background: 'rgba(199,72,74,0.12)', border: `1px solid ${T.red}`, color: T.red,
-    borderRadius: 6, padding: '8px 10px', cursor: 'pointer',
-    fontFamily: "'Oswald', sans-serif", fontSize: 10, fontWeight: 700, letterSpacing: 1.2,
   },
 
   // MODAL
