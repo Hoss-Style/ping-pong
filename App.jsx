@@ -434,6 +434,9 @@ export default function App() {
     return () => subscription.unsubscribe();
   }, []);
 
+  // Track whether a save is in flight so real-time doesn't echo it back
+  const isSaving = useRef(false);
+
   // Load from Supabase + real-time sync for all viewers
   useEffect(() => {
     supabase
@@ -441,7 +444,8 @@ export default function App() {
       .select('data')
       .eq('id', ROOM_ID)
       .single()
-      .then(({ data: row }) => {
+      .then(({ data: row, error }) => {
+        if (error) console.error('[load]', error);
         if (row?.data) setData(row.data);
         setLoaded(true);
       });
@@ -449,6 +453,8 @@ export default function App() {
     const channel = supabase
       .channel('tournament')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'tournament_state' }, payload => {
+        // Skip the echo of our own save — admin already has latest state in memory
+        if (isSaving.current) return;
         if (payload.new?.data) setData(payload.new.data);
       })
       .subscribe();
@@ -459,10 +465,18 @@ export default function App() {
   // Save to Supabase — admins only
   useEffect(() => {
     if (!loaded || !isAdmin) return;
+    isSaving.current = true;
     supabase.from('tournament_state').upsert({
       id: ROOM_ID,
       data,
       updated_at: new Date().toISOString(),
+    }).then(({ error }) => {
+      if (error) {
+        console.error('[save]', error);
+        setToast('⚠️ Save failed'); setTimeout(() => setToast(null), 3000);
+      }
+      // Allow a short window then re-enable real-time updates from others
+      setTimeout(() => { isSaving.current = false; }, 1000);
     });
   }, [data, loaded, isAdmin]);
 
