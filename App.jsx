@@ -1110,7 +1110,9 @@ function MatchCard({ matchId, match, data, onTeamTap, onSlotTap, onRemovePlayer,
 
       <div style={S.vsRow}>
         <div style={S.vsLine} />
-        <div style={S.vsLabel}>VS</div>
+        {match.winner && matchScoreString(match)
+          ? <div style={S.vsScore}>{matchScoreString(match)}</div>
+          : <div style={S.vsLabel}>VS</div>}
         <div style={S.vsLine} />
       </div>
 
@@ -1645,7 +1647,11 @@ function DesktopMatchCard({ matchId, data, onTeamTap, onScoreEdit, onShareMatch,
         </div>
       </div>
       {renderSlot(0)}
-      <div style={S.dmcDivider} />
+      <div style={S.dmcDivider}>
+        {match.winner && matchScoreString(match) && (
+          <span style={S.dmcScore}>{matchScoreString(match)}</span>
+        )}
+      </div>
       {renderSlot(1)}
     </div>
   );
@@ -3370,6 +3376,7 @@ const S = {
   vsRow: { display: 'flex', alignItems: 'center', gap: 8, padding: '0 16px' },
   vsLine: { flex: 1, height: 1, background: T.rim },
   vsLabel: { fontFamily: "'Oswald', sans-serif", fontSize: 10, fontWeight: 600, letterSpacing: 2, color: 'rgba(245,238,220,0.5)' },
+  vsScore: { fontFamily: "'Oswald', sans-serif", fontSize: 11, fontWeight: 700, letterSpacing: 1, color: T.goldBr },
   scoreButton: {
     background: 'rgba(212,165,75,0.12)', border: `1px solid ${T.gold}`,
     color: T.goldBr, borderRadius: 4, padding: '4px 8px', cursor: 'pointer',
@@ -4184,7 +4191,8 @@ const S = {
   dmcSlotChamp:   { background: T.goldGlow },
   dmcSlotLose:    { opacity: 0.4 },
   dmcSlotEmpty:   { display: 'flex', alignItems: 'center', gap: 7, padding: '7px 9px', flex: 1, opacity: 0.3 },
-  dmcDivider:     { height: 1, background: T.rim, flexShrink: 0 },
+  dmcDivider:     { height: 1, background: T.rim, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'visible' },
+  dmcScore:       { fontFamily: "'Oswald', sans-serif", fontSize: 9, fontWeight: 700, letterSpacing: 1, color: T.goldBr, background: T.bgCard, padding: '0 4px', position: 'relative' },
   dmcSeed:        { color: T.gold, fontSize: 14, fontWeight: 700, fontFamily: 'Oswald, sans-serif', minWidth: 18, textAlign: 'center', flexShrink: 0 },
   dmcSeedEmpty:   { color: T.ivoryDim, fontSize: 14, fontFamily: 'Oswald, sans-serif', minWidth: 18, textAlign: 'center', flexShrink: 0 },
   dmcPiTag:       { fontSize: 8, marginLeft: 1, opacity: 0.7 },
