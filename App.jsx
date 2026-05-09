@@ -685,6 +685,25 @@ export default function App() {
     showToast('Bracket progress cleared');
   };
 
+  const clearTeamRosters = () => {
+    setData(prev => {
+      const next = cloneData(prev);
+      // Empty all player slots on every team — keeps team names, seeds, and match structure
+      Object.keys(next.teams).forEach(tid => {
+        next.teams[tid].playerIds = [null, null];
+      });
+      // Also clear match winners/scores since teams are now empty
+      Object.keys(next.matches).forEach(id => {
+        next.matches[id].winner = null;
+        next.matches[id].isForfeit = false;
+        next.matches[id].scores = { team1: [], team2: [] };
+      });
+      return next;
+    });
+    setResetMenu(false);
+    showToast('Team rosters cleared');
+  };
+
   const resetEverything = () => {
     setData(makeDefaultData());
     setResetMenu(false);
@@ -929,6 +948,7 @@ export default function App() {
           <ResetMenu
             onClose={() => setResetMenu(false)}
             onResetBracket={resetBracketProgress}
+            onClearRosters={clearTeamRosters}
             onResetAll={resetEverything}
           />
         )}
@@ -2650,21 +2670,26 @@ function ChampionBadge({ team, players }) {
 // ═══════════════════════════════════════════════════════════════════════════
 // RESET MENU
 // ═══════════════════════════════════════════════════════════════════════════
-function ResetMenu({ onClose, onResetBracket, onResetAll }) {
+function ResetMenu({ onClose, onResetBracket, onClearRosters, onResetAll }) {
   return (
     <div style={S.modalBackdrop} onClick={onClose}>
       <div style={S.modal} onClick={e => e.stopPropagation()}>
         <div style={S.modalTitle}>RESET OPTIONS</div>
         <div style={S.modalDesc}>What would you like to clear?</div>
 
+        <button style={S.modalOption} onClick={onClearRosters}>
+          <div style={S.modalOptionTitle}>CLEAR TEAM ROSTERS</div>
+          <div style={S.modalOptionDesc}>Remove players from all teams · keep team names & seeds</div>
+        </button>
+
         <button style={S.modalOption} onClick={onResetBracket}>
           <div style={S.modalOptionTitle}>RESET BRACKET PROGRESS</div>
-          <div style={S.modalOptionDesc}>Clear winners only · keep teams & seeds</div>
+          <div style={S.modalOptionDesc}>Clear winners & scores · keep rosters & seeds</div>
         </button>
 
         <button style={S.modalOptionDanger} onClick={onResetAll}>
           <div style={{ ...S.modalOptionTitle, color: T.red }}>RESET EVERYTHING</div>
-          <div style={S.modalOptionDesc}>Restore default players & seeding</div>
+          <div style={S.modalOptionDesc}>Restore all defaults · wipes players, names & seeding</div>
         </button>
 
         <button style={S.modalCancel} onClick={onClose}>CANCEL</button>
