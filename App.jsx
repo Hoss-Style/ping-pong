@@ -399,9 +399,8 @@ function LandingPage({ onEnter }) {
   const [visible, setVisible] = useState(false);
   useEffect(() => { requestAnimationFrame(() => setVisible(true)); }, []);
 
-  const handleEnter = (tab) => {
-    sessionStorage.setItem('atlas-seen-landing', '1');
-    onEnter(tab);
+  const handleEnter = () => {
+    onEnter();
   };
 
   return (
@@ -532,7 +531,7 @@ function LandingPage({ onEnter }) {
       }}>
         <button
           className="landing-cta"
-          onClick={() => handleEnter('bracket')}
+          onClick={() => handleEnter()}
           style={{
             background: 'rgba(11,30,23,0.7)',
             border: `1px solid ${T.rim}`,
@@ -569,9 +568,6 @@ export default function App() {
   const [tableFilter, setTableFilter] = useState('all');
   const [urlView, setUrlView] = useState(() => new URLSearchParams(window.location.search).get('view') || '');
   const [printMode, setPrintMode] = useState(false);
-  const [showLanding, setShowLanding] = useState(
-    () => !sessionStorage.getItem('atlas-seen-landing') && !new URLSearchParams(window.location.search).get('view')
-  );
 
   const navigateView = (view) => {
     const url = view ? `?view=${view}` : window.location.pathname;
@@ -907,17 +903,15 @@ export default function App() {
 
   const champion = data.matches.FINAL?.winner ? data.teams[data.matches.FINAL.winner] : null;
 
-  // Landing page
-  if (showLanding) {
+  // URL-based view routing
+  if (urlView === 'landing') {
     return (
       <>
         <style>{globalCSS}</style>
-        <LandingPage onEnter={(tab) => { setTab(tab || 'bracket'); setShowLanding(false); }} />
+        <LandingPage onEnter={() => navigateView('')} />
       </>
     );
   }
-
-  // URL-based view routing
   if (urlView === 'bracket') {
     return <TVDisplay data={data} view="bracket" onExit={() => navigateView('')} />;
   }
