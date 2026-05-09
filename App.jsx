@@ -523,62 +523,29 @@ function LandingPage({ onEnter }) {
           "DREAM BIG"
         </div>
 
-        {/* CTA buttons */}
-        <div style={{
-          display: 'flex', gap: 12, flexWrap: 'wrap',
-          animation: 'landingFadeUp 0.7s 0.5s both',
-        }}>
-          <button
-            className="landing-cta"
-            onClick={() => handleEnter('bracket')}
-            style={{
-              background: T.gold, color: T.bgDeep,
-              border: 'none', borderRadius: 6,
-              fontFamily: 'Oswald, sans-serif', fontWeight: 700,
-              fontSize: 16, letterSpacing: 2,
-              padding: '14px 32px',
-              cursor: 'pointer',
-              boxShadow: `0 4px 20px rgba(242,162,58,0.35)`,
-              transition: 'all 0.18s ease',
-            }}
-          >
-            VIEW BRACKET →
-          </button>
-          <button
-            className="landing-bracket-btn"
-            onClick={() => handleEnter('schedule')}
-            style={{
-              background: 'rgba(242,162,58,0.08)',
-              color: T.gold,
-              border: `1px solid ${T.rim}`,
-              borderRadius: 6,
-              fontFamily: 'Oswald, sans-serif', fontWeight: 600,
-              fontSize: 14, letterSpacing: 2,
-              padding: '14px 24px',
-              cursor: 'pointer',
-              transition: 'all 0.18s ease',
-            }}
-          >
-            SCHEDULE
-          </button>
-        </div>
       </div>
 
-      {/* Top-right badge */}
+      {/* Top-right continue button */}
       <div style={{
         position: 'absolute', top: 20, right: 20,
         opacity: visible ? 1 : 0, transition: 'opacity 0.8s 0.4s ease',
       }}>
-        <div style={{
-          background: 'rgba(11,30,23,0.7)',
-          border: `1px solid ${T.rim}`,
-          borderRadius: 8, padding: '6px 14px',
-          fontFamily: 'Oswald, sans-serif', fontSize: 11,
-          letterSpacing: 2, color: T.gold,
-          backdropFilter: 'blur(8px)',
-        }}>
-          PING PONG TOURNAMENT
-        </div>
+        <button
+          className="landing-cta"
+          onClick={() => handleEnter('bracket')}
+          style={{
+            background: 'rgba(11,30,23,0.7)',
+            border: `1px solid ${T.rim}`,
+            borderRadius: 8, padding: '10px 20px',
+            fontFamily: 'Oswald, sans-serif', fontSize: 13,
+            letterSpacing: 2, color: T.gold,
+            cursor: 'pointer',
+            backdropFilter: 'blur(8px)',
+            transition: 'all 0.18s ease',
+          }}
+        >
+          CONTINUE →
+        </button>
       </div>
     </div>
   );
