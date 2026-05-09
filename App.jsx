@@ -1889,6 +1889,41 @@ function SeedEditor({ data, side, currentSeed, onClose, onReassign }) {
 // ═══════════════════════════════════════════════════════════════════════════
 // SCHEDULE VIEW
 // ═══════════════════════════════════════════════════════════════════════════
+function ScheduleMatchLine({ mid, tableNum, data }) {
+  const match = mid ? data.matches[mid] : null;
+  const t1 = match?.slots[0] ? data.teams[match.slots[0]] : null;
+  const t2 = match?.slots[1] ? data.teams[match.slots[1]] : null;
+  const w1 = match?.winner && match.winner === match?.slots[0];
+  const w2 = match?.winner && match.winner === match?.slots[1];
+  const n1 = t1 ? getTeamDisplayName(t1, data) : 'TBD';
+  const n2 = t2 ? getTeamDisplayName(t2, data) : 'TBD';
+  const done = !!match?.winner;
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 0, minWidth: 0 }}>
+      <div style={{
+        fontFamily: 'Oswald, sans-serif', fontSize: 11, fontWeight: 600,
+        color: T.gold, letterSpacing: 1, minWidth: 24, flexShrink: 0,
+      }}>T{tableNum}</div>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0, flex: 1 }}>
+        <span style={{
+          fontFamily: 'Barlow Condensed, sans-serif', fontSize: 14, fontWeight: 600,
+          color: w2 ? T.ivoryDim : T.ivory,
+          opacity: done && !w1 ? 0.45 : 1,
+          overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+        }}>{n1}</span>
+        <span style={{ fontFamily: 'Barlow Condensed, sans-serif', fontSize: 11, color: T.sage, flexShrink: 0 }}>vs</span>
+        <span style={{
+          fontFamily: 'Barlow Condensed, sans-serif', fontSize: 14, fontWeight: 600,
+          color: w1 ? T.ivoryDim : T.ivory,
+          opacity: done && !w2 ? 0.45 : 1,
+          overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+        }}>{n2}</span>
+        {done && <span style={{ fontSize: 11, color: T.gold, flexShrink: 0 }}>✓</span>}
+      </div>
+    </div>
+  );
+}
+
 function ScheduleView({ data, isAdmin, onTimeEdit, onSlotStart }) {
   const [, setTick] = useState(0);
   useEffect(() => {
@@ -1896,104 +1931,60 @@ function ScheduleView({ data, isAdmin, onTimeEdit, onSlotStart }) {
     return () => clearInterval(id);
   }, []);
 
-  // On event day use projected times; before/after use static schedule
   const rawLive = getLiveSlotInfo(SCHEDULE_SLOTS);
   const isEventDay = rawLive.status === 'live' || (rawLive.status === 'upcoming' && rawLive.daysUntil == null);
   const slots = isEventDay ? getProjectedSlots(data) : SCHEDULE_SLOTS;
   const live = getLiveSlotInfo(slots);
 
-  const liveSlot = live.status === 'live' ? slots[live.index] : null;
-  const nextSlot = live.status === 'live' && live.index + 1 < slots.length
-    ? slots[live.index + 1] : null;
-  const nextSlotIdx = live.status === 'live' ? live.index + 1 : -1;
-
-  // Before event day — show full agenda
-  if (live.status === 'upcoming') {
-    return (
-      <div style={S.scheduleView}>
-        <div style={{ padding: '12px 16px 4px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <div style={{ fontFamily: 'Oswald, sans-serif', fontSize: 13, letterSpacing: 2, color: T.gold }}>
-            FULL SCHEDULE · {EVENT_DATE}
-          </div>
-          <div style={{ fontFamily: 'Barlow Condensed, sans-serif', fontSize: 12, color: T.ivoryDim, letterSpacing: 1 }}>
-            3 TABLES · 4:30 – 6:30 PM
-          </div>
-        </div>
-        {SCHEDULE_SLOTS.map((slot, idx) => (
-          <div key={idx} style={{
-            borderBottom: `1px solid rgba(242,162,58,0.1)`,
-            padding: '10px 16px',
-            display: 'flex', alignItems: 'flex-start', gap: 12,
-          }}>
-            <div style={{
-              fontFamily: 'Oswald, sans-serif', fontSize: 13, fontWeight: 600,
-              color: T.gold, letterSpacing: 0.5, minWidth: 130, paddingTop: 2,
-              flexShrink: 0,
-            }}>
-              {slot.time}
-            </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 2, flex: 1 }}>
-              <div style={{ fontFamily: 'Barlow Condensed, sans-serif', fontSize: 11, letterSpacing: 2, color: T.sage, marginBottom: 4 }}>
-                {slot.round}
-              </div>
-              {slot.matchIds.map((mid, i) => {
-                if (!mid) return null;
-                const match = data.matches[mid];
-                const t1 = match?.slots[0] ? data.teams[match.slots[0]] : null;
-                const t2 = match?.slots[1] ? data.teams[match.slots[1]] : null;
-                const n1 = t1 ? getTeamDisplayName(t1, data) : 'TBD';
-                const n2 = t2 ? getTeamDisplayName(t2, data) : 'TBD';
-                return (
-                  <div key={i} style={{
-                    fontFamily: 'Barlow Condensed, sans-serif', fontSize: 13, color: T.ivoryDim,
-                    display: 'flex', alignItems: 'center', gap: 6,
-                  }}>
-                    <span style={{ color: T.bgSoft, fontSize: 11 }}>T{slot.tables[i]}</span>
-                    <span style={{ color: T.ivory }}>{n1}</span>
-                    <span style={{ color: T.sage, fontSize: 11 }}>vs</span>
-                    <span style={{ color: T.ivory }}>{n2}</span>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        ))}
-      </div>
-    );
-  }
-
-  // Event day — finished
   if (live.status === 'finished') {
-    return (
-      <div style={S.scheduleView}>
-        <div style={S.schedFinished}>🏆 TOURNAMENT COMPLETE</div>
-      </div>
-    );
+    return <div style={S.scheduleView}><div style={S.schedFinished}>🏆 TOURNAMENT COMPLETE</div></div>;
   }
 
-  // Event day — live view
   return (
     <div style={S.scheduleView}>
-      {liveSlot && (
-        <div style={S.schedSection}>
-          <div style={S.schedSectionLabel}>
-            <span style={S.liveDot} /> LIVE NOW · {liveSlot.round}
+      {slots.map((slot, idx) => {
+        const isLive = live.status === 'live' && live.index === idx;
+        const isPast = (live.status === 'live' && idx < live.index) || live.status === 'finished';
+        const isNext = live.status === 'live' && live.index + 1 === idx;
+        return (
+          <div key={idx} style={{
+            display: 'flex', alignItems: 'stretch',
+            borderBottom: `1px solid rgba(242,162,58,0.1)`,
+            background: isLive ? 'rgba(242,162,58,0.07)' : 'transparent',
+            opacity: isPast ? 0.4 : 1,
+          }}>
+            {/* Left: time + status */}
+            <div style={{
+              width: 90, flexShrink: 0, padding: '12px 10px 12px 14px',
+              borderRight: `2px solid ${isLive ? T.gold : isNext ? T.rimSoft : 'rgba(242,162,58,0.08)'}`,
+              display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: 4,
+            }}>
+              {isLive && <div style={{ display: 'flex', alignItems: 'center', gap: 5, marginBottom: 2 }}>
+                <span style={S.liveDot} />
+                <span style={{ fontFamily: 'Oswald, sans-serif', fontSize: 9, color: T.gold, letterSpacing: 1.5 }}>LIVE</span>
+              </div>}
+              {isNext && !isLive && <div style={{ fontFamily: 'Oswald, sans-serif', fontSize: 9, color: T.sage, letterSpacing: 1.5, marginBottom: 2 }}>UP NEXT</div>}
+              <div style={{
+                fontFamily: 'Oswald, sans-serif', fontWeight: 600,
+                fontSize: 12, color: isLive ? T.gold : T.ivoryDim,
+                lineHeight: 1.3,
+              }}>
+                {slot.time.split('–')[0].trim()}
+              </div>
+              <div style={{ fontFamily: 'Barlow Condensed, sans-serif', fontSize: 10, color: T.sage, letterSpacing: 1 }}>
+                {slot.round}
+              </div>
+            </div>
+
+            {/* Right: matches */}
+            <div style={{ flex: 1, padding: '10px 14px', display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: 6 }}>
+              {slot.matchIds.map((mid, i) => mid ? (
+                <ScheduleMatchLine key={i} mid={mid} tableNum={slot.tables[i]} data={data} />
+              ) : null)}
+            </div>
           </div>
-          <SchedMatchRow slot={liveSlot} slotIdx={live.index} data={data}
-            isAdmin={isAdmin} onSlotStart={onSlotStart} />
-        </div>
-      )}
-      {nextSlot && (
-        <div style={S.schedSection}>
-          <div style={{ ...S.schedSectionLabel, color: T.ivoryDim }}>
-            UP NEXT · {nextSlot.round}
-            {nextSlot.projected && <span style={S.slotEstBadge}>EST</span>}
-            <span style={S.schedNextTime}>{nextSlot.time}</span>
-          </div>
-          <SchedMatchRow slot={nextSlot} slotIdx={nextSlotIdx} data={data}
-            isAdmin={isAdmin} onSlotStart={onSlotStart} />
-        </div>
-      )}
+        );
+      })}
     </div>
   );
 }
@@ -3114,7 +3105,9 @@ function TVScheduleDisplay({ data, onExit }) {
     return () => clearInterval(id);
   }, []);
 
-  const slots = useMemo(() => getProjectedSlots(data), [data]);
+  const rawLive = getLiveSlotInfo(SCHEDULE_SLOTS);
+  const isEventDay = rawLive.status === 'live' || (rawLive.status === 'upcoming' && rawLive.daysUntil == null);
+  const slots = useMemo(() => isEventDay ? getProjectedSlots(data) : SCHEDULE_SLOTS, [data, isEventDay]);
   const live = getLiveSlotInfo(slots);
   const stats = useMemo(() => computeStats(data), [data]);
 
