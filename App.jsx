@@ -2687,11 +2687,6 @@ function ResetMenu({ onClose, onResetBracket, onClearRosters, onResetAll }) {
           <div style={S.modalOptionDesc}>Clear winners & scores · keep rosters & seeds</div>
         </button>
 
-        <button style={S.modalOptionDanger} onClick={onResetAll}>
-          <div style={{ ...S.modalOptionTitle, color: T.red }}>RESET EVERYTHING</div>
-          <div style={S.modalOptionDesc}>Restore all defaults · wipes players, names & seeding</div>
-        </button>
-
         <button style={S.modalCancel} onClick={onClose}>CANCEL</button>
       </div>
     </div>
