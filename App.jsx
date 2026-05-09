@@ -2919,10 +2919,10 @@ function TVDisplay({ data, onExit }) {
             <div style={S.tvBrandSub}>INVITATIONAL · {EVENT_DATE}</div>
           </div>
         </div>
-        {countdown && !champion && (
+        {liveSlot && countdown && !champion && (
           <div style={S.tvTopCountdown}>
             <span style={S.tvLiveDot} />
-            <span style={S.tvTopCountdownText}>{liveSlot ? countdown : countdown}</span>
+            <span style={S.tvTopCountdownText}>{countdown}</span>
           </div>
         )}
         <div style={S.tvClock}>
