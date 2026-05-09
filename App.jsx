@@ -1111,9 +1111,6 @@ function MatchCard({ matchId, match, data, onTeamTap, onSlotTap, onRemovePlayer,
       <div style={S.vsRow}>
         <div style={S.vsLine} />
         <div style={S.vsLabel}>VS</div>
-        {match.winner && (
-          <button style={S.shareButton} onClick={onShareMatch}>📤</button>
-        )}
         <div style={S.vsLine} />
       </div>
 
@@ -1645,11 +1642,6 @@ function DesktopMatchCard({ matchId, data, onTeamTap, onScoreEdit, onShareMatch,
       <div style={{ ...S.dmcHeader, ...(isFinalCard ? { background: T.goldDark, borderBottom: `1px solid ${T.gold}` } : {}) }}>
         <span style={{ ...S.dmcLabel, ...(isFinalCard ? { color: T.goldGlow, fontSize: 11, letterSpacing: 1.5 } : {}) }}>{shortLabel}</span>
         <div style={S.dmcBtns}>
-          {match.winner && onShareMatch && (
-            <button style={S.dmcBtn}
-              onClick={e => { e.stopPropagation(); onShareMatch({ matchId }); }}
-              title="Share">📤</button>
-          )}
         </div>
       </div>
       {renderSlot(0)}
