@@ -853,6 +853,8 @@ export default function App() {
           next.matches[id].slots = [null, null];
         }
       });
+      next.slotActualStarts = [];
+      next.slotActualEnds = [];
       return next;
     });
     setResetMenu(false);
@@ -871,6 +873,8 @@ export default function App() {
         next.matches[id].isForfeit = false;
         next.matches[id].scores = { team1: [], team2: [] };
       });
+      next.slotActualStarts = [];
+      next.slotActualEnds = [];
       return next;
     });
     setResetMenu(false);
