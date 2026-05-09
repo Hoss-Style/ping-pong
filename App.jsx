@@ -1024,6 +1024,15 @@ export default function App() {
                 next.slotActualStarts[slotIdx][tableIdx] = new Date().toISOString();
                 setData(next);
               }}
+              onSlotStop={(slotIdx, tableIdx) => {
+                const next = cloneData(data);
+                if (!next.slotActualEnds) next.slotActualEnds = [];
+                if (!Array.isArray(next.slotActualEnds[slotIdx])) {
+                  next.slotActualEnds[slotIdx] = [null, null, null];
+                }
+                next.slotActualEnds[slotIdx][tableIdx] = new Date().toISOString();
+                setData(next);
+              }}
             />
           )}
           {tab === 'players' && (
@@ -1924,7 +1933,7 @@ function ScheduleMatchLine({ mid, tableNum, data }) {
   );
 }
 
-function ScheduleView({ data, isAdmin, onTimeEdit, onSlotStart }) {
+function ScheduleView({ data, isAdmin, onTimeEdit, onSlotStart, onSlotStop }) {
   const [, setTick] = useState(0);
   useEffect(() => {
     const id = setInterval(() => setTick(t => t + 1), 15000);
@@ -1986,7 +1995,11 @@ function ScheduleView({ data, isAdmin, onTimeEdit, onSlotStart }) {
                 const done = !!match?.winner;
                 const storedTs = data.slotActualStarts?.[slotIdx]?.[i] || slot.tableStarts?.[i];
                 const actualTs = storedTs ? new Date(storedTs) : null;
-                const canStart = isAdmin && !actualTs && !done;
+                const stoppedTs = data.slotActualEnds?.[slotIdx]?.[i];
+                const manuallyStopped = !!stoppedTs;
+                const isDone = done || manuallyStopped;
+                const canStart = isAdmin && !actualTs && !isDone;
+                const canStop = isAdmin && actualTs && !isDone;
 
                 return (
                   <div key={i} style={{
@@ -2004,33 +2017,43 @@ function ScheduleView({ data, isAdmin, onTimeEdit, onSlotStart }) {
                     <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 6, minWidth: 0 }}>
                       <span style={{
                         fontFamily: 'Barlow Condensed, sans-serif', fontSize: 14, fontWeight: 600,
-                        color: done ? (w1 ? T.gold : T.sage) : T.ivory,
+                        color: isDone ? (w1 ? T.gold : T.sage) : T.ivory,
                         overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
                       }}>{n1 || '—'}</span>
                       <span style={{ fontFamily: 'Barlow Condensed, sans-serif', fontSize: 11, color: T.sage, flexShrink: 0 }}>vs</span>
                       <span style={{
                         fontFamily: 'Barlow Condensed, sans-serif', fontSize: 14, fontWeight: 600,
-                        color: done ? (w2 ? T.gold : T.sage) : T.ivory,
+                        color: isDone ? (w2 ? T.gold : T.sage) : T.ivory,
                         overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
                       }}>{n2 || '—'}</span>
-                      {done && <span style={{ fontSize: 12, color: T.gold, flexShrink: 0 }}>✓</span>}
                     </div>
 
-                    {/* Status / Start */}
-                    {actualTs && (
-                      <div style={{ fontFamily: 'Barlow Condensed, sans-serif', fontSize: 11, color: T.sage, flexShrink: 0, marginLeft: 8 }}>
-                        ● {actualTs.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', hour12: true })}
-                      </div>
-                    )}
-                    {canStart && (
-                      <button style={{
-                        marginLeft: 8, background: T.bgSoft, border: `1px solid ${T.rim}`,
-                        color: T.gold, fontFamily: 'Oswald, sans-serif', fontSize: 10,
-                        letterSpacing: 1, padding: '4px 10px', borderRadius: 4, cursor: 'pointer', flexShrink: 0,
-                      }} onClick={() => onSlotStart(slotIdx, i)}>
-                        START
-                      </button>
-                    )}
+                    {/* Status / Start / Stop */}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginLeft: 8, flexShrink: 0 }}>
+                      {actualTs && (
+                        <div style={{ fontFamily: 'Barlow Condensed, sans-serif', fontSize: 11, color: isDone ? T.sage : T.gold, letterSpacing: 0.5 }}>
+                          {isDone ? '✓' : '●'} {actualTs.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', hour12: true })}
+                        </div>
+                      )}
+                      {canStart && (
+                        <button style={{
+                          background: T.bgSoft, border: `1px solid ${T.rim}`,
+                          color: T.gold, fontFamily: 'Oswald, sans-serif', fontSize: 10,
+                          letterSpacing: 1, padding: '4px 10px', borderRadius: 4, cursor: 'pointer',
+                        }} onClick={() => onSlotStart(slotIdx, i)}>
+                          START
+                        </button>
+                      )}
+                      {canStop && (
+                        <button style={{
+                          background: 'rgba(180,40,40,0.15)', border: '1px solid rgba(220,60,60,0.35)',
+                          color: '#E07070', fontFamily: 'Oswald, sans-serif', fontSize: 10,
+                          letterSpacing: 1, padding: '4px 10px', borderRadius: 4, cursor: 'pointer',
+                        }} onClick={() => onSlotStop(slotIdx, i)}>
+                          STOP
+                        </button>
+                      )}
+                    </div>
                   </div>
                 );
               })}
