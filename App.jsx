@@ -3295,230 +3295,250 @@ function TVScheduleDisplay({ data, onExit }) {
 // PRINT SCHEDULE
 // ═══════════════════════════════════════════════════════════════════════════
 function PrintSchedule({ data, onClose }) {
+  const [printTab, setPrintTab] = useState('schedule');
   const slots = getEffectiveSlots(data);
-  const piDone = data.matches.L_PI?.winner && data.matches.R_PI?.winner;
 
   return (
     <div style={S.printBackdrop}>
-      <div style={S.printContainer}>
-        <div style={S.printHeader}>
-          <h1 style={S.printTitle}>ATLAS SUPREME · INVITATIONAL</h1>
-          <p style={S.printSubtitle}>{EVENT_DATE} · 4:30 – 6:30 PM · 18 TEAMS</p>
-          <button onClick={() => window.print()} style={S.printBtn}>🖨️ PRINT</button>
-          <button onClick={onClose} style={S.printCloseBtn}>CLOSE</button>
-        </div>
-        <table style={S.printTable}>
-          <thead><tr>
-            <th style={S.printTh}>TIME</th>
-            <th style={S.printTh}>TABLE 1</th>
-            <th style={S.printTh}>TABLE 2</th>
-            <th style={S.printTh}>TABLE 3</th>
-          </tr></thead>
-          <tbody>
-            {slots.map((slot, idx) => (
-              <tr key={idx}>
-                <td style={{ ...S.printTd, ...S.printTimeCell }}>
-                  <strong>{slot.time}</strong><br />
-                  <small>{slot.duration}</small>
-                </td>
-                {[0, 1, 2].map(i => (
-                  <td key={i} style={S.printTd}>
-                    {slot.matchIds[i]
-                      ? <PrintMatchCell matchId={slot.matchIds[i]} data={data} />
-                      : <div style={S.printEmpty}>{slot.tables[i]}</div>}
-                  </td>
-                ))}
-              </tr>
+      <div style={{ maxWidth: printTab === 'bracket' ? 1060 : 900, margin: '0 auto', background: '#fff', color: '#1a1a1a', fontFamily: 'Arial, sans-serif' }}>
+
+        {/* Top controls — hidden on print */}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 0 18px', borderBottom: '2px solid #222', marginBottom: 24 }} className="no-print">
+          {/* Tabs */}
+          <div style={{ display: 'flex', gap: 6 }}>
+            {[{ id: 'schedule', label: '📋 SCHEDULE' }, { id: 'bracket', label: '🏆 PREDICTION BRACKET' }].map(t => (
+              <button key={t.id} onClick={() => setPrintTab(t.id)} style={{
+                background: printTab === t.id ? '#1A3A2C' : '#f0f0f0',
+                color: printTab === t.id ? '#F2A23A' : '#555',
+                border: printTab === t.id ? '1.5px solid #D4A54B' : '1.5px solid #ccc',
+                padding: '8px 16px', borderRadius: 4, fontWeight: 700, cursor: 'pointer', fontSize: 13, letterSpacing: 0.5,
+              }}>{t.label}</button>
             ))}
-          </tbody>
-        </table>
-        <div style={S.printFooter}>
-          <p><b>COMPETE · HAVE FUN · DREAM BIG</b></p>
-          <p>1 GAME TO 21 · FINALS BEST OF 3 · 3 TABLES</p>
+          </div>
+          {/* Actions */}
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button onClick={() => window.print()} style={S.printBtn}>🖨️ PRINT</button>
+            <button onClick={onClose} style={S.printCloseBtn}>✕ CLOSE</button>
+          </div>
         </div>
 
-        <PrintBracket data={data} />
+        {/* SCHEDULE VIEW */}
+        {printTab === 'schedule' && (
+          <div data-print-area>
+            <div style={{ textAlign: 'center', marginBottom: 24 }}>
+              <h1 style={S.printTitle}>ATLAS SUPREME · INVITATIONAL</h1>
+              <p style={S.printSubtitle}>{EVENT_DATE} · 4:30 – 6:30 PM · 18 TEAMS</p>
+            </div>
+            <table style={S.printTable}>
+              <thead><tr>
+                <th style={S.printTh}>TIME</th>
+                <th style={S.printTh}>TABLE 1</th>
+                <th style={S.printTh}>TABLE 2</th>
+                <th style={S.printTh}>TABLE 3</th>
+              </tr></thead>
+              <tbody>
+                {slots.map((slot, idx) => (
+                  <tr key={idx}>
+                    <td style={{ ...S.printTd, ...S.printTimeCell }}>
+                      <strong>{slot.time}</strong><br />
+                      <small>{slot.duration}</small>
+                    </td>
+                    {[0, 1, 2].map(i => (
+                      <td key={i} style={S.printTd}>
+                        {slot.matchIds[i]
+                          ? <PrintMatchCell matchId={slot.matchIds[i]} data={data} />
+                          : <div style={S.printEmpty}>{slot.tables[i]}</div>}
+                      </td>
+                    ))}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            <div style={S.printFooter}>
+              <p><b>COMPETE · HAVE FUN · DREAM BIG</b></p>
+              <p>1 GAME TO 21 · FINALS BEST OF 3 · 3 TABLES</p>
+            </div>
+          </div>
+        )}
+
+        {/* BRACKET VIEW */}
+        {printTab === 'bracket' && <PrintBracket data={data} />}
       </div>
     </div>
   );
 }
 
 function PrintBracket({ data }) {
-  const tName = (teamId) => {
-    if (!teamId || !data.teams[teamId]) return '';
-    return getTeamDisplayName(data.teams[teamId], data);
-  };
-  const slotName = (matchId, pos) => {
+  const getTeam = (matchId, pos) => {
     const m = data.matches[matchId];
-    return m?.slots[pos] ? tName(m.slots[pos]) : '';
+    if (!m?.slots[pos]) return null;
+    const team = data.teams[m.slots[pos]];
+    return team ? { name: getTeamDisplayName(team, data), seed: team.seed } : null;
   };
 
-  // Layout constants (px)
-  const SH = 19;   // single slot height
-  const G  = 5;    // gap between two slots in one match
-  const MH = SH*2+G; // match box height = 43
-  const BG = 15;   // gap between R16 matches
-  const STEP = MH+BG; // = 58 — vertical distance between R16 match tops
-  const H  = 4*STEP-BG; // total bracket height = 4*58-15 = 217px
+  // Layout constants
+  const SH = 28;
+  const G  = 4;
+  const MH = SH * 2 + G;  // 60
+  const BG = 22;
+  const STEP = MH + BG;   // 82
+  const H  = 4 * STEP - BG; // 306
 
-  // Pre-compute vertical centers (from column top)
-  const mc  = top => top + SH + G/2;            // center of a match box
-  const r16T = [0, STEP, 2*STEP, 3*STEP];       // R16 match tops
-  const r16C = r16T.map(mc);                     // R16 centers  [21.5, 79.5, 137.5, 195.5]
-  const qfC  = [(r16C[0]+r16C[1])/2, (r16C[2]+r16C[3])/2]; // QF centers [50.5, 166.5]
-  const qfT  = qfC.map(c => c - MH/2);          // QF match tops [29, 145]
-  const sfC  = (qfC[0]+qfC[1])/2;               // SF center = 108.5
-  const sfT  = sfC - MH/2;                      // SF match top = 87
-  const finT = sfT;                             // FINAL aligned with SF center
+  const mc   = top => top + SH + G / 2;
+  const r16T = [0, STEP, 2*STEP, 3*STEP];
+  const r16C = r16T.map(mc);
+  const qfC  = [(r16C[0]+r16C[1])/2, (r16C[2]+r16C[3])/2];
+  const qfT  = qfC.map(c => c - MH/2);
+  const sfC  = (qfC[0]+qfC[1])/2;
+  const sfT  = sfC - MH/2;
 
-  // Column x positions (left edge)
-  const R16W=138, QFW=112, SFW=102, FINW=116, CW=20, PAD=10;
+  const R16W=148, QFW=118, SFW=110, FINW=120, CW=20, PAD=8;
   const lR16X=PAD, lCon1X=PAD+R16W, lQFX=lCon1X+CW, lCon2X=lQFX+QFW, lSFX=lCon2X+CW;
-  const lCon3X=lSFX+SFW;
-  const finX=lCon3X+CW;
+  const lCon3X=lSFX+SFW, finX=lCon3X+CW;
   const rCon3X=finX+FINW, rSFX=rCon3X+CW, rCon2X=rSFX+SFW, rQFX=rCon2X+CW;
   const rCon1X=rQFX+QFW, rR16X=rCon1X+CW;
   const TOTAL_W=rR16X+R16W+PAD;
 
-  // Team name slot (one underlined row)
-  const Slot = ({ name }) => (
+  // Single team slot — underline style
+  const Slot = ({ team, blank }) => (
     <div style={{
-      height: SH, borderBottom: '1px solid #999',
-      padding: '1px 4px 0', fontSize: 9,
-      fontFamily: 'Arial, sans-serif',
-      color: name ? '#111' : 'transparent',
-      whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
-      boxSizing: 'border-box',
-    }}>{name || '.'}</div>
-  );
-
-  // Match box (2 slots, no right connector — SVG handles lines)
-  const MBox = ({ s0, s1, w }) => (
-    <div style={{ width: w, boxSizing: 'border-box' }}>
-      <Slot name={s0} /><div style={{ height: G }} /><Slot name={s1} />
+      height: SH, borderBottom: blank ? '1.5px solid #aaa' : '1.5px solid #333',
+      padding: '0 6px', display: 'flex', alignItems: 'center', gap: 6,
+      boxSizing: 'border-box', background: '#fff',
+    }}>
+      {!blank && team && (
+        <>
+          <span style={{
+            fontSize: 11, fontWeight: 800, color: '#B5761E', minWidth: 20, textAlign: 'right', flexShrink: 0,
+            fontFamily: "'Barlow Condensed', 'Oswald', Arial, sans-serif",
+          }}>{team.seed}</span>
+          <span style={{
+            fontSize: 12, fontWeight: 600, color: '#111',
+            fontFamily: "'Barlow Condensed', 'Oswald', Arial, sans-serif",
+            whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+          }}>{team.name}</span>
+        </>
+      )}
     </div>
   );
 
-  // SVG bracket lines for one side (left = normal, right = mirrored via transform)
-  // Lines: from right edge of each round's match to midpoint, then to next round's match left
+  // Match box — two slots with a small gap
+  const MBox = ({ t0, t1, w, showNames }) => (
+    <div style={{ width: w }}>
+      <Slot team={t0} blank={!showNames} />
+      <div style={{ height: G }} />
+      <Slot team={t1} blank={!showNames} />
+    </div>
+  );
+
+  // SVG connector lines
   const lines = [];
   const addH = (x1, x2, y) => lines.push(`M${x1},${y} H${x2}`);
   const addV = (x, y1, y2) => lines.push(`M${x},${y1} V${y2}`);
 
-  // Left side connectors
-  // R16 → QF
-  [[0,1],[2,3]].forEach(([a,b], qi) => {
+  [[0,1],[2,3]].forEach(([a,b]) => {
     const midX = lCon1X + CW/2;
-    const midY = (r16C[a]+r16C[b])/2; // = qfC[qi]
-    addH(lCon1X, midX, r16C[a]);  // R16_a center → midX
-    addH(lCon1X, midX, r16C[b]);  // R16_b center → midX
-    addV(midX, r16C[a], r16C[b]); // vertical bracket
-    addH(midX, lQFX, midY);       // midX → QF match left
+    addH(lCon1X, midX, r16C[a]); addH(lCon1X, midX, r16C[b]);
+    addV(midX, r16C[a], r16C[b]); addH(midX, lQFX, (r16C[a]+r16C[b])/2);
   });
-  // QF → SF
-  const midX2 = lCon2X + CW/2;
-  addH(lCon2X, midX2, qfC[0]);
-  addH(lCon2X, midX2, qfC[1]);
-  addV(midX2, qfC[0], qfC[1]);
-  addH(midX2, lSFX, sfC);
-  // SF → FINAL
+  const lMid2 = lCon2X + CW/2;
+  addH(lCon2X, lMid2, qfC[0]); addH(lCon2X, lMid2, qfC[1]);
+  addV(lMid2, qfC[0], qfC[1]); addH(lMid2, lSFX, sfC);
   addH(lCon3X, finX, sfC);
 
-  // Right side connectors (mirrored)
-  [[0,1],[2,3]].forEach(([a,b], qi) => {
+  [[0,1],[2,3]].forEach(([a,b]) => {
     const midX = rCon1X + CW/2;
-    const midY = (r16C[a]+r16C[b])/2;
-    addH(rR16X, midX, r16C[a]);
-    addH(rR16X, midX, r16C[b]);
-    addV(midX, r16C[a], r16C[b]);
-    addH(midX, rQFX+QFW, midY);
+    addH(rR16X, midX, r16C[a]); addH(rR16X, midX, r16C[b]);
+    addV(midX, r16C[a], r16C[b]); addH(midX, rQFX+QFW, (r16C[a]+r16C[b])/2);
   });
-  const midX2R = rCon2X + CW/2;
-  addH(rQFX, midX2R, qfC[0]);
-  addH(rQFX, midX2R, qfC[1]);
-  addV(midX2R, qfC[0], qfC[1]);
-  addH(midX2R, rSFX+SFW, sfC);
+  const rMid2 = rCon2X + CW/2;
+  addH(rQFX, rMid2, qfC[0]); addH(rQFX, rMid2, qfC[1]);
+  addV(rMid2, qfC[0], qfC[1]); addH(rMid2, rSFX+SFW, sfC);
   addH(rCon3X, finX+FINW, sfC);
 
-  // Absolutely positioned match boxes (left side)
-  const leftMatches = [
-    { ids: ['L_R1_1','L_R1_2','L_R1_3','L_R1_4'], tops: r16T, x: lR16X, w: R16W, show: true },
-    { ids: ['L_QF_1','L_QF_2'],                   tops: qfT,  x: lQFX, w: QFW,  show: false },
-    { ids: ['L_SF'],                              tops: [sfT], x: lSFX, w: SFW,  show: false },
+  const leftCols = [
+    { ids: ['L_R1_1','L_R1_2','L_R1_3','L_R1_4'], tops: r16T, x: lR16X, w: R16W, showNames: true  },
+    { ids: ['L_QF_1','L_QF_2'],                   tops: qfT,  x: lQFX,  w: QFW,  showNames: false },
+    { ids: ['L_SF'],                               tops: [sfT], x: lSFX, w: SFW,  showNames: false },
   ];
-  const rightMatches = [
-    { ids: ['R_R1_1','R_R1_2','R_R1_3','R_R1_4'], tops: r16T, x: rR16X, w: R16W, show: true },
-    { ids: ['R_QF_1','R_QF_2'],                   tops: qfT,  x: rQFX,  w: QFW,  show: false },
-    { ids: ['R_SF'],                              tops: [sfT], x: rSFX,  w: SFW,  show: false },
+  const rightCols = [
+    { ids: ['R_R1_1','R_R1_2','R_R1_3','R_R1_4'], tops: r16T, x: rR16X, w: R16W, showNames: true  },
+    { ids: ['R_QF_1','R_QF_2'],                   tops: qfT,  x: rQFX,  w: QFW,  showNames: false },
+    { ids: ['R_SF'],                               tops: [sfT], x: rSFX, w: SFW,  showNames: false },
   ];
 
-  const roundLabelStyle = {
-    position: 'absolute', bottom: H + 6,
-    fontSize: 8, fontWeight: 700, letterSpacing: 1,
-    color: '#B5761E', fontFamily: 'Arial, sans-serif', textAlign: 'center',
-  };
+  const LABEL_H = 22;
 
   return (
-    <div style={{ marginTop: 36, pageBreakBefore: 'always', fontFamily: 'Arial, sans-serif', background: '#fff', color: '#111' }}>
+    <div data-print-area style={{ fontFamily: "'Barlow Condensed', Arial, sans-serif", background: '#fff', color: '#111' }}>
+
       {/* Header */}
-      <div style={{ textAlign: 'center', marginBottom: 4 }}>
-        <div style={{ fontSize: 15, fontWeight: 700, letterSpacing: 3 }}>ATLAS SUPREME INVITATIONAL</div>
-        <div style={{ fontSize: 10, color: '#666', letterSpacing: 1 }}>PREDICTION BRACKET · {EVENT_DATE} · SINGLE ELIMINATION</div>
-      </div>
-      <div style={{ display: 'flex', justifyContent: 'center', gap: 48, marginBottom: 18, fontSize: 10 }}>
-        <span>NAME: <span style={{ display: 'inline-block', width: 160, borderBottom: '1px solid #555' }}>&nbsp;</span></span>
-        <span>WINNER PICK: <span style={{ display: 'inline-block', width: 130, borderBottom: '1px solid #555' }}>&nbsp;</span></span>
+      <div style={{ textAlign: 'center', marginBottom: 20 }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 12, marginBottom: 4 }}>
+          <svg width="36" height="29" viewBox="0 0 100 80" fill="none">
+            <polyline points="12,76 50,4 88,76" stroke="#2E5B4E" strokeWidth="13" strokeLinecap="round" strokeLinejoin="round"/>
+          </svg>
+          <span style={{ fontSize: 22, fontWeight: 800, letterSpacing: 4, color: '#111', fontFamily: "'Oswald', Arial, sans-serif" }}>
+            ATLAS <span style={{ color: '#B5761E' }}>SUPREME</span> INVITATIONAL
+          </span>
+        </div>
+        <div style={{ fontSize: 11, color: '#666', letterSpacing: 2, fontFamily: "'Barlow Condensed', Arial, sans-serif" }}>
+          PREDICTION BRACKET · {EVENT_DATE} · SINGLE ELIMINATION
+        </div>
+        <div style={{ display: 'flex', justifyContent: 'center', gap: 56, marginTop: 14, fontSize: 11, color: '#333' }}>
+          <span>NAME: <span style={{ display: 'inline-block', width: 180, borderBottom: '1.2px solid #555' }}>&nbsp;</span></span>
+          <span>WINNER PICK: <span style={{ display: 'inline-block', width: 150, borderBottom: '1.2px solid #555' }}>&nbsp;</span></span>
+        </div>
       </div>
 
       {/* Bracket canvas */}
-      <div style={{ position: 'relative', width: TOTAL_W, height: H + 30, margin: '0 auto' }}>
+      <div style={{ position: 'relative', width: TOTAL_W, height: H + LABEL_H + 8, margin: '0 auto' }}>
 
-        {/* Round column header labels */}
+        {/* Round labels */}
         {[
-          { label: 'ROUND OF 16', x: lR16X, w: R16W },
-          { label: 'QUARTERFINAL', x: lQFX, w: QFW },
-          { label: 'SEMIFINAL', x: lSFX, w: SFW },
-          { label: 'CHAMPION', x: finX, w: FINW },
-          { label: 'SEMIFINAL', x: rSFX, w: SFW },
-          { label: 'QUARTERFINAL', x: rQFX, w: QFW },
-          { label: 'ROUND OF 16', x: rR16X, w: R16W },
+          { label: 'ROUND OF 16',  x: lR16X, w: R16W },
+          { label: 'QUARTERFINAL', x: lQFX,  w: QFW  },
+          { label: 'SEMIFINAL',    x: lSFX,  w: SFW  },
+          { label: 'CHAMPION',     x: finX,  w: FINW  },
+          { label: 'SEMIFINAL',    x: rSFX,  w: SFW  },
+          { label: 'QUARTERFINAL', x: rQFX,  w: QFW  },
+          { label: 'ROUND OF 16',  x: rR16X, w: R16W },
         ].map(({ label, x, w }, i) => (
-          <div key={i} style={{ position: 'absolute', top: 0, left: x, width: w, textAlign: 'center', fontSize: 7.5, fontWeight: 700, letterSpacing: 0.8, color: '#B5761E', fontFamily: 'Arial, sans-serif' }}>
-            {label}
-          </div>
+          <div key={i} style={{
+            position: 'absolute', top: 0, left: x, width: w, textAlign: 'center',
+            fontSize: 9, fontWeight: 700, letterSpacing: 1, color: '#B5761E',
+            fontFamily: "'Barlow Condensed', 'Oswald', Arial, sans-serif",
+            borderBottom: '1.5px solid #D4A54B', paddingBottom: 4,
+          }}>{label}</div>
         ))}
 
         {/* SVG bracket lines */}
-        <svg style={{ position: 'absolute', top: 18, left: 0, overflow: 'visible' }} width={TOTAL_W} height={H}>
-          {lines.map((d, i) => <path key={i} d={d} fill="none" stroke="#aaa" strokeWidth="1" />)}
+        <svg style={{ position: 'absolute', top: LABEL_H, left: 0, overflow: 'visible' }} width={TOTAL_W} height={H}>
+          {lines.map((d, i) => <path key={i} d={d} fill="none" stroke="#555" strokeWidth="1.2"/>)}
         </svg>
 
         {/* Match boxes */}
-        <div style={{ position: 'absolute', top: 18, left: 0, width: TOTAL_W, height: H }}>
-          {[...leftMatches, ...rightMatches].map((col, ci) =>
+        <div style={{ position: 'absolute', top: LABEL_H, left: 0, width: TOTAL_W, height: H }}>
+          {[...leftCols, ...rightCols].map(col =>
             col.ids.map((mid, mi) => (
               <div key={mid} style={{ position: 'absolute', top: col.tops[mi], left: col.x }}>
-                <MBox
-                  s0={col.show ? slotName(mid, 0) : ''}
-                  s1={col.show ? slotName(mid, 1) : ''}
-                  w={col.w}
-                />
+                <MBox t0={getTeam(mid, 0)} t1={getTeam(mid, 1)} w={col.w} showNames={col.showNames} />
               </div>
             ))
           )}
 
           {/* FINAL box */}
-          <div style={{ position: 'absolute', top: finT, left: finX }}>
-            <div style={{ border: '1.5px solid #D4A54B', borderRadius: 3, width: FINW, overflow: 'hidden' }}>
-              <Slot name="" />
-              <div style={{ height: G, background: '#D4A54B', opacity: 0.2 }} />
-              <Slot name="" />
+          <div style={{ position: 'absolute', top: sfT, left: finX }}>
+            <div style={{ border: '2px solid #D4A54B', borderRadius: 3, width: FINW, background: 'rgba(212,165,75,0.05)', overflow: 'hidden' }}>
+              <Slot blank />
+              <div style={{ height: G, background: '#D4A54B', opacity: 0.25 }} />
+              <Slot blank />
             </div>
           </div>
         </div>
       </div>
 
-      <p style={{ textAlign: 'center', fontSize: 8.5, color: '#888', marginTop: 14, fontFamily: 'Arial' }}>
+      <p style={{ textAlign: 'center', fontSize: 9, color: '#888', marginTop: 12, letterSpacing: 1 }}>
         1 GAME TO 21 · FINALS BEST OF 3 · MUST WIN BY 2 · COMPETE · DREAM BIG
       </p>
     </div>
@@ -4687,5 +4707,6 @@ button:disabled { opacity: 0.5; cursor: not-allowed; }
 @media print {
   body * { visibility: hidden; }
   [data-print-area], [data-print-area] * { visibility: visible; }
+  .no-print { display: none !important; }
 }
 `;
