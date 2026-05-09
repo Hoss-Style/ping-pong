@@ -907,6 +907,19 @@ export default function App() {
             picker={picker}
             onClose={() => setPicker(null)}
             onPick={(pid) => placePlayer(picker.teamId, picker.slotIndex, pid)}
+            onPickAlt={(altId) => {
+              const next = cloneData(data);
+              const alt = (next.alternates || []).find(a => a.id === altId);
+              if (!alt) return;
+              next.alternates = next.alternates.filter(a => a.id !== altId);
+              if (!next.players.find(p => p.id === alt.id)) next.players.push({ id: alt.id, name: alt.name });
+              Object.keys(next.teams).forEach(tid => {
+                next.teams[tid].playerIds = next.teams[tid].playerIds.map(pid => pid === alt.id ? null : pid);
+              });
+              next.teams[picker.teamId].playerIds[picker.slotIndex] = alt.id;
+              setData(next);
+              setPicker(null);
+            }}
           />
         )}
         {seedEditor && (
@@ -1985,7 +1998,7 @@ function PlayersView({ data, isAdmin, editingPlayer, setEditingPlayer, updatePla
       {subTab === 'alternates' && (
         <div style={S.altView}>
           <div style={S.altInfo}>
-            Subs can be assigned to any open team slot. They'll be added as a player and removed from this list.
+            Subs appear in the player picker when assigning players to teams. Selecting one adds them as a player.
           </div>
           {isAdmin && (
             <div style={S.altAddRow}>
@@ -2012,9 +2025,8 @@ function PlayersView({ data, isAdmin, editingPlayer, setEditingPlayer, updatePla
           {alternates.length === 0 ? (
             <div style={S.altEmpty}>No alternates added yet.{isAdmin ? ' Add names above.' : ''}</div>
           ) : alternates.map(alt => (
-            <AltRow key={alt.id} alt={alt} data={data} isAdmin={isAdmin}
-              onRemove={() => onRemoveAlternate(alt.id)}
-              onAssign={(teamId, slotIndex) => onAssignAlternate(alt.id, teamId, slotIndex)} />
+            <AltRow key={alt.id} alt={alt} isAdmin={isAdmin}
+              onRemove={() => onRemoveAlternate(alt.id)} />
           ))}
         </div>
       )}
@@ -2071,45 +2083,11 @@ function TeamSlot({ name, empty, onTap }) {
   );
 }
 
-function AltRow({ alt, data, isAdmin, onRemove, onAssign }) {
-  const [assigning, setAssigning] = useState(false);
-  const allTeams = Object.values(data.teams).sort((a,b) => a.side === b.side ? a.seed - b.seed : a.side.localeCompare(b.side));
-
-  if (assigning) {
-    return (
-      <div style={S.altAssignPanel}>
-        <div style={S.altAssignTitle}>Assign <b>{alt.name}</b> to:</div>
-        <div style={S.altAssignList}>
-          {allTeams.map(team => {
-            const p1 = team.playerIds[0] ? data.players.find(p => p.id === team.playerIds[0]) : null;
-            const p2 = team.playerIds[1] ? data.players.find(p => p.id === team.playerIds[1]) : null;
-            return (
-              <div key={team.id} style={S.altAssignTeam}>
-                <div style={S.altAssignSeed}>{team.side}{team.seed}</div>
-                <div style={S.altAssignSlots}>
-                  <button style={{ ...S.altAssignSlotBtn, ...(p1 ? S.altAssignSlotReplace : S.altAssignSlotEmpty) }}
-                    onClick={() => { onAssign(team.id, 0); setAssigning(false); }}>
-                    {p1 ? `↔ ${p1.name}` : '+ SLOT 1 (EMPTY)'}
-                  </button>
-                  <button style={{ ...S.altAssignSlotBtn, ...(p2 ? S.altAssignSlotReplace : S.altAssignSlotEmpty) }}
-                    onClick={() => { onAssign(team.id, 1); setAssigning(false); }}>
-                    {p2 ? `↔ ${p2.name}` : '+ SLOT 2 (EMPTY)'}
-                  </button>
-                </div>
-              </div>
-            );
-          })}
-        </div>
-        <button style={S.altCancelBtn} onClick={() => setAssigning(false)}>CANCEL</button>
-      </div>
-    );
-  }
-
+function AltRow({ alt, isAdmin, onRemove }) {
   return (
     <div style={S.altRow}>
       <div style={S.altName}>{alt.name}</div>
       <div style={S.altActions}>
-        {isAdmin && <button style={S.altAssignBtn} onClick={() => setAssigning(true)}>ASSIGN →</button>}
         {isAdmin && <button style={S.altRemoveBtn} onClick={onRemove}>✕</button>}
       </div>
     </div>
@@ -2170,7 +2148,7 @@ function PlayerRow({ player, num, team, isEditing, onEditStart, onEditEnd, onSav
 // ═══════════════════════════════════════════════════════════════════════════
 // PLAYER PICKER
 // ═══════════════════════════════════════════════════════════════════════════
-function PlayerPicker({ data, picker, onClose, onPick }) {
+function PlayerPicker({ data, picker, onClose, onPick, onPickAlt }) {
   const team = data.teams[picker.teamId];
   const [search, setSearch] = useState('');
 
@@ -2182,13 +2160,18 @@ function PlayerPicker({ data, picker, onClose, onPick }) {
     });
   }, [data]);
 
+  const alternates = data.alternates || [];
+  const q = search.toLowerCase();
+
   const filtered = playersWithStatus
-    .filter(p => p.name.toLowerCase().includes(search.toLowerCase()))
+    .filter(p => p.name.toLowerCase().includes(q))
     .sort((a, b) => {
       if (!a.placedTeam && b.placedTeam) return -1;
       if (a.placedTeam && !b.placedTeam) return 1;
       return 0;
     });
+
+  const filteredAlts = alternates.filter(a => a.name.toLowerCase().includes(q));
 
   return (
     <div style={S.sheetBackdrop} onClick={onClose}>
@@ -2230,6 +2213,20 @@ function PlayerPicker({ data, picker, onClose, onPick }) {
               </div>
             );
           })}
+          {filteredAlts.length > 0 && (
+            <>
+              <div style={S.pickerDivider}>SUBS</div>
+              {filteredAlts.map(alt => (
+                <div key={alt.id} style={S.pickerItem} onClick={() => onPickAlt(alt.id)}>
+                  <div style={S.pickerLeft}>
+                    <div style={S.pickerName}>{alt.name}</div>
+                    <div style={S.pickerStatus}>SUB · will be added as player</div>
+                  </div>
+                  <div style={S.pickerAdd}>+</div>
+                </div>
+              ))}
+            </>
+          )}
         </div>
       </div>
     </div>
@@ -3791,6 +3788,11 @@ const S = {
     background: T.gold, color: T.bgDeep,
     fontFamily: "'Oswald', sans-serif", fontSize: 10, fontWeight: 700, letterSpacing: 1.5,
     padding: '4px 10px', borderRadius: 3, flexShrink: 0,
+  },
+  pickerDivider: {
+    padding: '8px 16px', fontFamily: "'Oswald', sans-serif", fontSize: 10, fontWeight: 700,
+    letterSpacing: 2, color: T.gold, background: 'rgba(212,165,75,0.08)',
+    borderBottom: `1px solid ${T.rim}`, borderTop: `1px solid ${T.rim}`,
   },
 
   // SCORE EDITOR
