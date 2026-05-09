@@ -462,16 +462,9 @@ function LandingPage({ onEnter }) {
         opacity: visible ? 1 : 0,
         transition: 'opacity 0.6s ease',
       }}>
-        {/* Stars */}
-        <div style={{
-          display: 'flex', gap: 8, marginBottom: 14,
-          animation: 'landingFadeUp 0.7s 0.1s both',
-        }}>
-          {[0,1,2].map(i => (
-            <svg key={i} width="16" height="16" viewBox="0 0 16 16" fill={T.gold}>
-              <polygon points="8,1 10,6 15,6 11,9.5 12.5,15 8,12 3.5,15 5,9.5 1,6 6,6"/>
-            </svg>
-          ))}
+        {/* Atlas A logomark */}
+        <div style={{ marginBottom: 16, animation: 'landingFadeUp 0.7s 0.05s both' }}>
+          <AtlasA size={72} color={T.ivory} />
         </div>
 
         {/* Event name */}
@@ -485,6 +478,13 @@ function LandingPage({ onEnter }) {
         }}>
           ATLAS<br />
           <span style={{ color: T.gold }}>SUPREME</span>
+        </div>
+        {/* Gold stars — matching wordmark */}
+        <div style={{
+          display: 'flex', gap: 10, marginBottom: 10,
+          animation: 'landingFadeUp 0.7s 0.26s both',
+        }}>
+          <Star size={18} /><Star size={18} /><Star size={18} />
         </div>
         <div style={{
           fontFamily: 'Barlow Condensed, sans-serif', fontWeight: 600,
@@ -931,12 +931,11 @@ export default function App() {
         {/* HEADER */}
         <header style={S.header}>
           <div style={S.brandBlock}>
-            <div style={S.starRow}>
-              <Star size={11} /><Star size={11} /><Star size={11} />
+            <AtlasA size={48} color={T.bgSoft} />
+            <div style={{ marginLeft: 10 }}>
+              <div style={S.brandTitle}>ATLAS <span style={{ color: T.gold }}>SUPREME</span></div>
+              <div style={S.eventLabel}>INVITATIONAL · {EVENT_DATE}</div>
             </div>
-            <div style={S.brandTitle}>ATLAS</div>
-            <div style={S.brandSubtitle}>SUPREME</div>
-            <div style={S.eventLabel}>INVITATIONAL · {EVENT_DATE}</div>
           </div>
           <div style={S.headerActions}>
             <button style={S.iconBtn} onClick={() => navigateView('bracket')} title="Bracket TV">📺</button>
@@ -3009,9 +3008,9 @@ function TVDisplay({ data, onExit }) {
       {/* Top brand bar */}
       <div style={S.tvBrandBar}>
         <div style={S.tvBrandLeft}>
-          <div style={S.tvStarRow}><Star size={26} /><Star size={26} /><Star size={26} /></div>
-          <div>
-            <div style={S.tvBrandTitle}>ATLAS SUPREME</div>
+          <AtlasA size={52} color={T.ivory} />
+          <div style={{ marginLeft: 4 }}>
+            <div style={S.tvBrandTitle}>ATLAS <span style={{ color: T.gold }}>SUPREME</span></div>
             <div style={S.tvBrandSub}>INVITATIONAL · {EVENT_DATE}</div>
           </div>
         </div>
@@ -3171,9 +3170,9 @@ function TVScheduleDisplay({ data, onExit }) {
       {/* Top brand bar */}
       <div style={S.tvBrandBar}>
         <div style={S.tvBrandLeft}>
-          <div style={S.tvStarRow}><Star size={26} /><Star size={26} /><Star size={26} /></div>
-          <div>
-            <div style={S.tvBrandTitle}>ATLAS SUPREME</div>
+          <AtlasA size={52} color={T.ivory} />
+          <div style={{ marginLeft: 4 }}>
+            <div style={S.tvBrandTitle}>ATLAS <span style={{ color: T.gold }}>SUPREME</span></div>
             <div style={S.tvBrandSub}>SCHEDULE · {EVENT_DATE}</div>
           </div>
         </div>
@@ -3515,6 +3514,17 @@ function Star({ size = 14 }) {
     </svg>
   );
 }
+function AtlasA({ size = 40, color = T.bgSoft }) {
+  const h = size;
+  const w = size * (100 / 80);
+  return (
+    <svg width={w} height={h} viewBox="0 0 100 80" fill="none">
+      <polyline points="12,76 50,4 88,76"
+        stroke={color} strokeWidth="13"
+        strokeLinecap="round" strokeLinejoin="round"/>
+    </svg>
+  );
+}
 function CheckIcon({ color }) {
   return (
     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke={color || T.gold} strokeWidth="3">
@@ -3554,20 +3564,20 @@ const S = {
     backdropFilter: 'blur(14px)',
     WebkitBackdropFilter: 'blur(14px)',
   },
-  brandBlock: { display: 'flex', flexDirection: 'column', alignItems: 'flex-start' },
+  brandBlock: { display: 'flex', flexDirection: 'row', alignItems: 'center', gap: 0 },
   starRow: { display: 'flex', gap: 4, marginBottom: 4 },
   brandTitle: {
     fontFamily: "'Oswald', sans-serif",
-    fontSize: 28, fontWeight: 700, letterSpacing: 5, lineHeight: 1, color: T.ivory,
+    fontSize: 22, fontWeight: 700, letterSpacing: 3, lineHeight: 1, color: T.ivory,
   },
   brandSubtitle: {
     fontFamily: "'Oswald', sans-serif",
     fontSize: 12, fontWeight: 300, letterSpacing: 7, lineHeight: 1, marginTop: 4, color: T.ivory,
   },
   eventLabel: {
-    color: T.gold,
+    color: T.sage,
     fontFamily: "'Oswald', sans-serif",
-    fontSize: 9, fontWeight: 600, letterSpacing: 1.6, marginTop: 8,
+    fontSize: 9, fontWeight: 600, letterSpacing: 1.6, marginTop: 5,
   },
   headerActions: { display: 'flex', gap: 6, alignItems: 'center' },
   iconBtn: {
