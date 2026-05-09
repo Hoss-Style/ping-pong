@@ -1984,7 +1984,8 @@ function ScheduleView({ data, isAdmin, onTimeEdit, onSlotStart }) {
                 const w1 = match?.winner === match?.slots[0];
                 const w2 = match?.winner === match?.slots[1];
                 const done = !!match?.winner;
-                const actualTs = slot.tableStarts?.[i] ? new Date(slot.tableStarts[i]) : null;
+                const storedTs = data.slotActualStarts?.[slotIdx]?.[i] || slot.tableStarts?.[i];
+                const actualTs = storedTs ? new Date(storedTs) : null;
                 const canStart = isAdmin && !actualTs && !done;
 
                 return (
