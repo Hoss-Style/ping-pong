@@ -1768,7 +1768,7 @@ function DesktopMatchCard({ matchId, data, onTeamTap, onScoreEdit, onShareMatch,
         onClick={() => !locked && onTeamTap && onTeamTap(matchId, teamId)}
       >
         <span style={{ ...S.dmcSeed, ...(champWin ? { color: T.bgDeep } : {}) }}>
-          {team.seed}{team.pi && <span style={S.dmcPiTag}>PI</span>}
+          {team.seed}
         </span>
         <div style={S.dmcPlayerNames}>
           {hasTeamName && (
