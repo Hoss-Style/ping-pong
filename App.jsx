@@ -899,11 +899,10 @@ export default function App() {
   const clearTeamRosters = () => {
     setData(prev => {
       const next = cloneData(prev);
-      // Empty all player slots on every team — keeps team names, seeds, and match structure
       Object.keys(next.teams).forEach(tid => {
         next.teams[tid].playerIds = [null, null];
+        next.teams[tid].name = null;
       });
-      // Also clear match winners/scores since teams are now empty
       Object.keys(next.matches).forEach(id => {
         next.matches[id].winner = null;
         next.matches[id].isForfeit = false;
@@ -1764,9 +1763,6 @@ function TVMatchCard({ matchId, data, width, isFinal = false }) {
         borderRadius: 12,
       } : {}),
     }}>
-      <div style={{ ...S.tvmcHeader, ...(isFinal ? S.tvmcHeaderFinal : {}) }}>
-        <span style={{ ...S.tvmcLabel, ...(isFinal ? S.tvmcLabelFinal : {}) }}>{shortLabel}</span>
-      </div>
       {renderSlot(0)}
       <div style={S.dmcDivider} />
       {renderSlot(1)}
@@ -1847,11 +1843,6 @@ function DesktopMatchCard({ matchId, data, onTeamTap, onScoreEdit, onShareMatch,
 
   return (
     <div style={{ ...S.dmc, width, ...finalCardStyle }}>
-      <div style={{ ...S.dmcHeader, ...(isFinalCard ? { background: T.goldDark, borderBottom: `1px solid ${T.gold}` } : {}) }}>
-        <span style={{ ...S.dmcLabel, ...(isFinalCard ? { color: T.goldGlow, fontSize: 11, letterSpacing: 1.5 } : {}) }}>{shortLabel}</span>
-        <div style={S.dmcBtns}>
-        </div>
-      </div>
       {renderSlot(0)}
       <div style={S.dmcDivider}>
         {match.winner && matchScoreString(match) && (
