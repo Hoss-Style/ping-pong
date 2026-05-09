@@ -842,8 +842,7 @@ export default function App() {
             />
           ))}
           {tab === 'schedule' && (
-            <ScheduleView data={data} tableFilter={tableFilter} setTableFilter={setTableFilter}
-              isAdmin={isAdmin}
+            <ScheduleView data={data} isAdmin={isAdmin}
               onTimeEdit={(idx, newTime) => {
                 const next = cloneData(data);
                 if (!next.scheduleTimes) next.scheduleTimes = Array(SCHEDULE_SLOTS.length).fill(null);
@@ -1731,77 +1730,111 @@ function SeedEditor({ data, side, currentSeed, onClose, onReassign }) {
 // ═══════════════════════════════════════════════════════════════════════════
 // SCHEDULE VIEW
 // ═══════════════════════════════════════════════════════════════════════════
-function ScheduleView({ data, tableFilter, setTableFilter, isAdmin, onTimeEdit, onSlotStart }) {
+function ScheduleView({ data, isAdmin, onTimeEdit, onSlotStart }) {
   const [, setTick] = useState(0);
   useEffect(() => {
-    const id = setInterval(() => setTick(t => t + 1), 30000);
+    const id = setInterval(() => setTick(t => t + 1), 15000);
     return () => clearInterval(id);
   }, []);
   const slots = getProjectedSlots(data);
   const live = getLiveSlotInfo(slots);
 
+  const liveSlot = live.status === 'live' ? slots[live.index] : null;
+  const nextSlot = live.status === 'live' && live.index + 1 < slots.length
+    ? slots[live.index + 1] : live.status === 'upcoming' ? slots[live.index] : null;
+  const nextSlotIdx = live.status === 'live' ? live.index + 1 : live.index;
+
   return (
     <div style={S.scheduleView}>
-      <div style={S.scheduleHeader}>
-        <div style={S.scheduleTitle}>TOURNAMENT SCHEDULE</div>
-        <div style={S.scheduleSub}>4:30 – 6:30 PM · 1 GAME TO 21 · FINALS BO3</div>
-      </div>
 
-      <div style={S.tableFilterRow}>
-        {[
-          { id: 'all', label: 'ALL TABLES' },
-          { id: 1, label: 'TABLE 1' },
-          { id: 2, label: 'TABLE 2' },
-          { id: 3, label: 'TABLE 3' },
-        ].map(opt => (
-          <button key={opt.id}
-            style={tableFilter === opt.id ? S.tableFilterBtnActive : S.tableFilterBtn}
-            onClick={() => setTableFilter(opt.id)}>{opt.label}</button>
-        ))}
-      </div>
-
-      {live.status === 'live' && (
-        <div style={S.liveBanner}>
-          <span style={S.liveDot} />
-          <span style={S.liveLabel}>LIVE NOW</span>
-          <span style={S.liveTime}>{slots[live.index].time}</span>
-        </div>
-      )}
-      {live.status === 'upcoming' && live.daysUntil > 0 && (
-        <div style={S.upNextBanner}>
-          <span style={S.upNextLabel}>TOURNAMENT IN</span>
-          <span style={S.upNextTime}>{live.daysUntil} {live.daysUntil === 1 ? 'DAY' : 'DAYS'}</span>
-        </div>
-      )}
-      {live.status === 'upcoming' && live.minutesUntil != null && live.minutesUntil <= 30 && (
-        <div style={S.upNextBanner}>
-          <span style={S.upNextLabel}>STARTS IN</span>
-          <span style={S.upNextTime}>{live.minutesUntil} MIN</span>
-        </div>
-      )}
       {live.status === 'finished' && (
-        <div style={S.finishedBanner}>🏆 TOURNAMENT COMPLETE</div>
+        <div style={S.schedFinished}>🏆 TOURNAMENT COMPLETE</div>
       )}
 
-      <div>
-        {slots.map((slot, idx) => {
-          const isPast = (live.status === 'live' && idx < live.index) || live.status === 'finished';
-          const isLive = live.status === 'live' && live.index === idx;
-          const isNext = live.status === 'live' && live.index + 1 === idx;
-          return (
-            <TimeSlot key={idx} slot={slot} slotIdx={idx} data={data} tableFilter={tableFilter}
-              isLive={isLive} isPast={isPast} isNext={isNext}
-              isAdmin={isAdmin} onTimeEdit={onTimeEdit}
-              onSlotStart={onSlotStart} />
-          );
-        })}
-      </div>
+      {live.status !== 'finished' && (
+        <>
+          {liveSlot && (
+            <div style={S.schedSection}>
+              <div style={S.schedSectionLabel}>
+                <span style={S.liveDot} /> LIVE NOW · {liveSlot.round}
+              </div>
+              <SchedMatchRow slot={liveSlot} slotIdx={live.index} data={data}
+                isAdmin={isAdmin} onSlotStart={onSlotStart} />
+            </div>
+          )}
 
-      <div style={S.scheduleFooter}>
-        <div style={S.scheduleNote}>🏓 <b>Format:</b> 1 game to 21 (rally scoring, win by 2)</div>
-        <div style={S.scheduleNote}>🥇 <b>Finals:</b> Best of 3 to 21</div>
-        <div style={S.scheduleNote}>⏱️ <b>Pace:</b> 12-min matches, 3-min buffers</div>
-      </div>
+          {nextSlot && (
+            <div style={S.schedSection}>
+              <div style={{ ...S.schedSectionLabel, color: T.ivoryDim }}>
+                UP NEXT · {nextSlot.round}
+                {nextSlot.projected && <span style={S.slotEstBadge}>EST</span>}
+                <span style={S.schedNextTime}>{nextSlot.time}</span>
+              </div>
+              <SchedMatchRow slot={nextSlot} slotIdx={nextSlotIdx} data={data}
+                isAdmin={isAdmin} onSlotStart={onSlotStart} />
+            </div>
+          )}
+
+          {!liveSlot && !nextSlot && live.status === 'upcoming' && (
+            <div style={S.schedUpcoming}>
+              <div style={S.schedUpcomingTitle}>ATLAS SUPREME INVITATIONAL</div>
+              <div style={S.schedUpcomingDate}>{EVENT_DATE} · 4:30 PM</div>
+            </div>
+          )}
+        </>
+      )}
+    </div>
+  );
+}
+
+function SchedMatchRow({ slot, slotIdx, data, isAdmin, onSlotStart }) {
+  return (
+    <div style={S.schedMatchRow}>
+      {[0, 1, 2].map(i => {
+        const mid = slot.matchIds[i];
+        const tableNum = slot.tables[i];
+        const match = mid ? data.matches[mid] : null;
+        const t1 = match?.slots[0] ? data.teams[match.slots[0]] : null;
+        const t2 = match?.slots[1] ? data.teams[match.slots[1]] : null;
+        const tableActualTs = slot.tableStarts?.[i] ? new Date(slot.tableStarts[i]) : null;
+        const canStart = isAdmin && !tableActualTs;
+
+        return (
+          <div key={i} style={S.schedTableCard}>
+            <div style={S.schedTableNum}>TABLE {tableNum}</div>
+            {mid && t1 && t2 ? (
+              <>
+                <SchedTeam team={t1} data={data} match={match} isWinner={match.winner === t1.id} />
+                <div style={S.schedVs}>VS</div>
+                <SchedTeam team={t2} data={data} match={match} isWinner={match.winner === t2.id} />
+                {match.winner && (
+                  <div style={S.schedResult}>{matchScoreString(match)}</div>
+                )}
+              </>
+            ) : (
+              <div style={S.schedTbd}>{mid ? 'Awaiting bracket' : 'Open'}</div>
+            )}
+            {tableActualTs ? (
+              <div style={S.schedStarted}>● {tableActualTs.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', hour12: true })}</div>
+            ) : canStart ? (
+              <button style={S.slotStartBtn} onClick={() => onSlotStart(slotIdx, i)}>▶ START</button>
+            ) : null}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+function SchedTeam({ team, data, match, isWinner }) {
+  const p1 = team.playerIds[0] ? data.players.find(p => p.id === team.playerIds[0]) : null;
+  const p2 = team.playerIds[1] ? data.players.find(p => p.id === team.playerIds[1]) : null;
+  return (
+    <div style={{ ...S.schedTeamRow, ...(isWinner ? S.schedTeamWinner : {}) }}>
+      <span style={S.schedTeamSeed}>{team.seed}</span>
+      <span style={S.schedTeamName}>
+        {team.name || getTeamDisplayName(team, data)}
+      </span>
     </div>
   );
 }
@@ -3439,58 +3472,41 @@ const S = {
   },
 
   // SCHEDULE
-  scheduleView: { padding: '12px 12px 16px' },
-  scheduleHeader: { padding: '4px 4px 12px' },
-  scheduleTitle: {
-    fontFamily: "'Oswald', sans-serif", fontSize: 16, fontWeight: 700, letterSpacing: 3, color: T.gold,
+  scheduleView: { padding: '16px 12px 24px', display: 'flex', flexDirection: 'column', gap: 24 },
+  schedFinished: {
+    padding: '20px 16px', textAlign: 'center',
+    background: 'rgba(212,165,75,0.1)', border: `1px solid ${T.gold}`, borderRadius: 8,
+    fontFamily: "'Oswald', sans-serif", fontSize: 16, fontWeight: 700, letterSpacing: 2, color: T.goldBr,
   },
-  scheduleSub: {
-    fontFamily: "'Barlow Condensed', sans-serif", fontSize: 11, color: 'rgba(245,238,220,0.7)',
-    marginTop: 4, letterSpacing: 0.5,
+  schedUpcoming: { padding: '32px 16px', textAlign: 'center', display: 'flex', flexDirection: 'column', gap: 8, alignItems: 'center' },
+  schedUpcomingTitle: { fontFamily: "'Oswald', sans-serif", fontSize: 18, fontWeight: 700, letterSpacing: 3, color: T.gold },
+  schedUpcomingDate: { fontFamily: "'Barlow Condensed', sans-serif", fontSize: 14, color: T.ivoryDim, letterSpacing: 1 },
+  schedSection: { display: 'flex', flexDirection: 'column', gap: 10 },
+  schedSectionLabel: {
+    display: 'flex', alignItems: 'center', gap: 8,
+    fontFamily: "'Oswald', sans-serif", fontSize: 11, fontWeight: 700, letterSpacing: 2, color: T.red,
   },
-
-  tableFilterRow: { display: 'flex', gap: 6, marginBottom: 12, flexWrap: 'wrap' },
-  tableFilterBtn: {
-    flex: 1, minWidth: 70,
-    background: 'rgba(212,165,75,0.04)', border: `1px solid ${T.rim}`,
-    color: 'rgba(245,238,220,0.6)',
-    padding: '6px 8px', borderRadius: 4, cursor: 'pointer',
-    fontFamily: "'Oswald', sans-serif", fontSize: 10, fontWeight: 600, letterSpacing: 1.2,
+  schedNextTime: { marginLeft: 'auto', fontFamily: "'Oswald', sans-serif", fontSize: 11, color: T.gold, letterSpacing: 0.5 },
+  schedMatchRow: { display: 'flex', gap: 8 },
+  schedTableCard: {
+    flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8,
+    padding: '12px 8px 10px',
+    background: T.bgCard, border: `1px solid ${T.rim}`, borderRadius: 8,
+    minWidth: 0,
   },
-  tableFilterBtnActive: {
-    flex: 1, minWidth: 70,
-    background: 'rgba(212,165,75,0.18)', border: `1px solid ${T.gold}`,
-    color: T.ivory,
-    padding: '6px 8px', borderRadius: 4, cursor: 'pointer',
-    fontFamily: "'Oswald', sans-serif", fontSize: 10, fontWeight: 600, letterSpacing: 1.2,
+  schedTableNum: { fontFamily: "'Oswald', sans-serif", fontSize: 9, fontWeight: 700, letterSpacing: 2, color: T.gold },
+  schedTeamRow: {
+    width: '100%', display: 'flex', alignItems: 'center', gap: 6,
+    padding: '5px 6px', borderRadius: 4, background: 'rgba(255,255,255,0.03)',
   },
-
-  liveBanner: {
-    display: 'flex', alignItems: 'center', gap: 10,
-    padding: '10px 14px', marginBottom: 12,
-    background: 'rgba(199,72,74,0.15)', border: `1px solid ${T.red}`, borderRadius: 6,
-    animation: 'pulse 2s infinite',
-  },
-  liveDot: { width: 8, height: 8, borderRadius: '50%', background: T.red, animation: 'pulse 1.5s infinite' },
-  liveLabel: {
-    fontFamily: "'Oswald', sans-serif", fontSize: 12, fontWeight: 700, letterSpacing: 2.5, color: T.red, flex: 1,
-  },
-  liveTime: { fontFamily: "'Oswald', sans-serif", fontSize: 13, fontWeight: 700, color: T.ivory },
-
-  upNextBanner: {
-    display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-    padding: '10px 14px', marginBottom: 12,
-    background: 'rgba(212,165,75,0.12)', border: `1px solid ${T.gold}`, borderRadius: 6,
-  },
-  upNextLabel: { fontFamily: "'Oswald', sans-serif", fontSize: 11, fontWeight: 700, letterSpacing: 2, color: T.gold },
-  upNextTime: { fontFamily: "'Oswald', sans-serif", fontSize: 14, fontWeight: 700, color: T.ivory },
-
-  finishedBanner: {
-    padding: '12px 14px', marginBottom: 12,
-    background: 'rgba(212,165,75,0.18)', border: `1px solid ${T.gold}`, borderRadius: 6,
-    color: T.goldBr,
-    fontFamily: "'Oswald', sans-serif", fontSize: 13, fontWeight: 700, letterSpacing: 2, textAlign: 'center',
-  },
+  schedTeamWinner: { background: 'rgba(212,165,75,0.12)', border: `1px solid rgba(212,165,75,0.3)` },
+  schedTeamSeed: { fontFamily: "'Oswald', sans-serif", fontSize: 10, fontWeight: 700, color: T.gold, minWidth: 14, textAlign: 'center' },
+  schedTeamName: { fontFamily: "'Oswald', sans-serif", fontSize: 11, fontWeight: 600, color: T.ivory, letterSpacing: 0.3, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 },
+  schedVs: { fontFamily: "'Oswald', sans-serif", fontSize: 9, fontWeight: 700, letterSpacing: 1.5, color: 'rgba(245,238,220,0.3)' },
+  schedResult: { fontFamily: "'Oswald', sans-serif", fontSize: 10, fontWeight: 700, color: T.goldBr, letterSpacing: 1 },
+  schedTbd: { fontFamily: "'Barlow Condensed', sans-serif", fontSize: 11, color: 'rgba(245,238,220,0.3)', fontStyle: 'italic', padding: '8px 0' },
+  schedStarted: { fontFamily: "'Barlow Condensed', sans-serif", fontSize: 10, color: T.gold, letterSpacing: 0.5 },
+  liveDot: { width: 7, height: 7, borderRadius: '50%', background: T.red, flexShrink: 0, animation: 'pulse 1.5s infinite' },
 
   timeSlot: {
     display: 'flex', minHeight: 140,
