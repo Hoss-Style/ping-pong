@@ -1895,52 +1895,104 @@ function ScheduleView({ data, isAdmin, onTimeEdit, onSlotStart }) {
     const id = setInterval(() => setTick(t => t + 1), 15000);
     return () => clearInterval(id);
   }, []);
-  const slots = getProjectedSlots(data);
+
+  // On event day use projected times; before/after use static schedule
+  const rawLive = getLiveSlotInfo(SCHEDULE_SLOTS);
+  const isEventDay = rawLive.status === 'live' || (rawLive.status === 'upcoming' && rawLive.daysUntil == null);
+  const slots = isEventDay ? getProjectedSlots(data) : SCHEDULE_SLOTS;
   const live = getLiveSlotInfo(slots);
 
   const liveSlot = live.status === 'live' ? slots[live.index] : null;
   const nextSlot = live.status === 'live' && live.index + 1 < slots.length
-    ? slots[live.index + 1] : live.status === 'upcoming' ? slots[live.index] : null;
-  const nextSlotIdx = live.status === 'live' ? live.index + 1 : live.index;
+    ? slots[live.index + 1] : null;
+  const nextSlotIdx = live.status === 'live' ? live.index + 1 : -1;
 
+  // Before event day — show full agenda
+  if (live.status === 'upcoming') {
+    return (
+      <div style={S.scheduleView}>
+        <div style={{ padding: '12px 16px 4px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <div style={{ fontFamily: 'Oswald, sans-serif', fontSize: 13, letterSpacing: 2, color: T.gold }}>
+            FULL SCHEDULE · {EVENT_DATE}
+          </div>
+          <div style={{ fontFamily: 'Barlow Condensed, sans-serif', fontSize: 12, color: T.ivoryDim, letterSpacing: 1 }}>
+            3 TABLES · 4:30 – 6:30 PM
+          </div>
+        </div>
+        {SCHEDULE_SLOTS.map((slot, idx) => (
+          <div key={idx} style={{
+            borderBottom: `1px solid rgba(242,162,58,0.1)`,
+            padding: '10px 16px',
+            display: 'flex', alignItems: 'flex-start', gap: 12,
+          }}>
+            <div style={{
+              fontFamily: 'Oswald, sans-serif', fontSize: 13, fontWeight: 600,
+              color: T.gold, letterSpacing: 0.5, minWidth: 130, paddingTop: 2,
+              flexShrink: 0,
+            }}>
+              {slot.time}
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 2, flex: 1 }}>
+              <div style={{ fontFamily: 'Barlow Condensed, sans-serif', fontSize: 11, letterSpacing: 2, color: T.sage, marginBottom: 4 }}>
+                {slot.round}
+              </div>
+              {slot.matchIds.map((mid, i) => {
+                if (!mid) return null;
+                const match = data.matches[mid];
+                const t1 = match?.slots[0] ? data.teams[match.slots[0]] : null;
+                const t2 = match?.slots[1] ? data.teams[match.slots[1]] : null;
+                const n1 = t1 ? getTeamDisplayName(t1, data) : 'TBD';
+                const n2 = t2 ? getTeamDisplayName(t2, data) : 'TBD';
+                return (
+                  <div key={i} style={{
+                    fontFamily: 'Barlow Condensed, sans-serif', fontSize: 13, color: T.ivoryDim,
+                    display: 'flex', alignItems: 'center', gap: 6,
+                  }}>
+                    <span style={{ color: T.bgSoft, fontSize: 11 }}>T{slot.tables[i]}</span>
+                    <span style={{ color: T.ivory }}>{n1}</span>
+                    <span style={{ color: T.sage, fontSize: 11 }}>vs</span>
+                    <span style={{ color: T.ivory }}>{n2}</span>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        ))}
+      </div>
+    );
+  }
+
+  // Event day — finished
+  if (live.status === 'finished') {
+    return (
+      <div style={S.scheduleView}>
+        <div style={S.schedFinished}>🏆 TOURNAMENT COMPLETE</div>
+      </div>
+    );
+  }
+
+  // Event day — live view
   return (
     <div style={S.scheduleView}>
-
-      {live.status === 'finished' && (
-        <div style={S.schedFinished}>🏆 TOURNAMENT COMPLETE</div>
+      {liveSlot && (
+        <div style={S.schedSection}>
+          <div style={S.schedSectionLabel}>
+            <span style={S.liveDot} /> LIVE NOW · {liveSlot.round}
+          </div>
+          <SchedMatchRow slot={liveSlot} slotIdx={live.index} data={data}
+            isAdmin={isAdmin} onSlotStart={onSlotStart} />
+        </div>
       )}
-
-      {live.status !== 'finished' && (
-        <>
-          {liveSlot && (
-            <div style={S.schedSection}>
-              <div style={S.schedSectionLabel}>
-                <span style={S.liveDot} /> LIVE NOW · {liveSlot.round}
-              </div>
-              <SchedMatchRow slot={liveSlot} slotIdx={live.index} data={data}
-                isAdmin={isAdmin} onSlotStart={onSlotStart} />
-            </div>
-          )}
-
-          {nextSlot && (
-            <div style={S.schedSection}>
-              <div style={{ ...S.schedSectionLabel, color: T.ivoryDim }}>
-                UP NEXT · {nextSlot.round}
-                {nextSlot.projected && <span style={S.slotEstBadge}>EST</span>}
-                <span style={S.schedNextTime}>{nextSlot.time}</span>
-              </div>
-              <SchedMatchRow slot={nextSlot} slotIdx={nextSlotIdx} data={data}
-                isAdmin={isAdmin} onSlotStart={onSlotStart} />
-            </div>
-          )}
-
-          {!liveSlot && !nextSlot && live.status === 'upcoming' && (
-            <div style={S.schedUpcoming}>
-              <div style={S.schedUpcomingTitle}>ATLAS SUPREME INVITATIONAL</div>
-              <div style={S.schedUpcomingDate}>{EVENT_DATE} · 4:30 PM</div>
-            </div>
-          )}
-        </>
+      {nextSlot && (
+        <div style={S.schedSection}>
+          <div style={{ ...S.schedSectionLabel, color: T.ivoryDim }}>
+            UP NEXT · {nextSlot.round}
+            {nextSlot.projected && <span style={S.slotEstBadge}>EST</span>}
+            <span style={S.schedNextTime}>{nextSlot.time}</span>
+          </div>
+          <SchedMatchRow slot={nextSlot} slotIdx={nextSlotIdx} data={data}
+            isAdmin={isAdmin} onSlotStart={onSlotStart} />
+        </div>
       )}
     </div>
   );
