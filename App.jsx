@@ -1033,6 +1033,13 @@ export default function App() {
                 next.slotActualEnds[slotIdx][tableIdx] = new Date().toISOString();
                 setData(next);
               }}
+              onSlotRestart={(slotIdx, tableIdx) => {
+                const next = cloneData(data);
+                if (Array.isArray(next.slotActualEnds?.[slotIdx])) {
+                  next.slotActualEnds[slotIdx][tableIdx] = null;
+                }
+                setData(next);
+              }}
             />
           )}
           {tab === 'players' && (
@@ -1933,7 +1940,7 @@ function ScheduleMatchLine({ mid, tableNum, data }) {
   );
 }
 
-function ScheduleView({ data, isAdmin, onTimeEdit, onSlotStart, onSlotStop }) {
+function ScheduleView({ data, isAdmin, onTimeEdit, onSlotStart, onSlotStop, onSlotRestart }) {
   const [, setTick] = useState(0);
   useEffect(() => {
     const id = setInterval(() => setTick(t => t + 1), 15000);
@@ -2051,6 +2058,15 @@ function ScheduleView({ data, isAdmin, onTimeEdit, onSlotStart, onSlotStop }) {
                           letterSpacing: 1, padding: '4px 10px', borderRadius: 4, cursor: 'pointer',
                         }} onClick={() => onSlotStop(slotIdx, i)}>
                           STOP
+                        </button>
+                      )}
+                      {manuallyStopped && !done && (
+                        <button style={{
+                          background: 'rgba(46,91,78,0.25)', border: `1px solid ${T.rim}`,
+                          color: T.sage, fontFamily: 'Oswald, sans-serif', fontSize: 10,
+                          letterSpacing: 1, padding: '4px 10px', borderRadius: 4, cursor: 'pointer',
+                        }} onClick={() => onSlotRestart(slotIdx, i)}>
+                          ↺ RESUME
                         </button>
                       )}
                     </div>
