@@ -1926,7 +1926,6 @@ function ScheduleMatchLine({ mid, tableNum, data }) {
 }
 
 function ScheduleView({ data, isAdmin, onTimeEdit, onSlotStart }) {
-  const [query, setQuery] = useState('');
   const [, setTick] = useState(0);
   useEffect(() => {
     const id = setInterval(() => setTick(t => t + 1), 15000);
@@ -1938,160 +1937,103 @@ function ScheduleView({ data, isAdmin, onTimeEdit, onSlotStart }) {
   const slots = isEventDay ? getProjectedSlots(data) : SCHEDULE_SLOTS;
   const live = getLiveSlotInfo(slots);
 
-  // Build player → matches lookup
-  const playerMatches = useMemo(() => {
-    const map = {};
-    data.players.forEach(p => { map[p.id] = []; });
-    slots.forEach((slot, si) => {
-      slot.matchIds.forEach((mid, ti) => {
-        if (!mid) return;
-        const m = data.matches[mid];
-        if (!m) return;
-        [m.slots[0], m.slots[1]].forEach((teamId, pos) => {
-          if (!teamId) return;
-          const team = data.teams[teamId];
-          if (!team) return;
-          team.playerIds.forEach(pid => {
-            if (!pid) return;
-            if (!map[pid]) map[pid] = [];
-            map[pid].push({ slot, slotIdx: si, tableNum: slot.tables[ti], matchId: mid, teamId, pos });
-          });
-        });
-      });
-    });
-    return map;
-  }, [data, slots]);
-
-  // Search results
-  const q = query.trim().toLowerCase();
-  const matchedPlayers = q.length >= 2
-    ? data.players.filter(p => p.name.toLowerCase().includes(q))
-    : [];
-
   if (live.status === 'finished') {
     return <div style={S.scheduleView}><div style={S.schedFinished}>🏆 TOURNAMENT COMPLETE</div></div>;
   }
 
   return (
     <div style={S.scheduleView}>
+      {slots.map((slot, slotIdx) => {
+        const isLive = live.status === 'live' && live.index === slotIdx;
+        const isPast = (live.status === 'live' && slotIdx < live.index) || live.status === 'finished';
+        const isNext = live.status === 'live' && live.index + 1 === slotIdx;
 
-      {/* ── Player lookup ── */}
-      <div style={{ padding: '14px 16px 10px', borderBottom: `1px solid rgba(242,162,58,0.12)` }}>
-        <div style={{ position: 'relative' }}>
-          <span style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', fontSize: 14, opacity: 0.4 }}>🔍</span>
-          <input
-            value={query}
-            onChange={e => setQuery(e.target.value)}
-            placeholder="Type your name to find your match time..."
-            style={{
-              width: '100%', boxSizing: 'border-box',
-              background: T.bgMid, border: `1px solid ${query ? T.rim : 'rgba(242,162,58,0.15)'}`,
-              borderRadius: 8, padding: '10px 14px 10px 36px',
-              color: T.ivory, fontSize: 15, fontFamily: 'Barlow Condensed, sans-serif',
-              outline: 'none',
-            }}
-          />
-          {query && (
-            <button onClick={() => setQuery('')} style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', color: T.sage, cursor: 'pointer', fontSize: 16 }}>✕</button>
-          )}
-        </div>
-
-        {/* Search results */}
-        {q.length >= 2 && (
-          <div style={{ marginTop: 10 }}>
-            {matchedPlayers.length === 0 ? (
-              <div style={{ fontFamily: 'Barlow Condensed, sans-serif', fontSize: 14, color: T.sage, padding: '4px 0' }}>No players found</div>
-            ) : matchedPlayers.map(player => {
-              const matches = playerMatches[player.id] || [];
-              return (
-                <div key={player.id} style={{ marginBottom: 10 }}>
-                  <div style={{ fontFamily: 'Oswald, sans-serif', fontSize: 16, fontWeight: 700, color: T.gold, letterSpacing: 1, marginBottom: 6 }}>
-                    {player.name}
-                  </div>
-                  {matches.length === 0 ? (
-                    <div style={{ fontFamily: 'Barlow Condensed, sans-serif', fontSize: 13, color: T.sage }}>Not yet scheduled</div>
-                  ) : matches.map((m, i) => {
-                    const opp = data.matches[m.matchId];
-                    const oppTeamId = opp?.slots[m.pos === 0 ? 1 : 0];
-                    const oppTeam = oppTeamId ? data.teams[oppTeamId] : null;
-                    const oppName = oppTeam ? getTeamDisplayName(oppTeam, data) : 'TBD';
-                    const startTime = m.slot.time.split('–')[0].trim();
-                    const isWon = opp?.winner === m.teamId;
-                    const isLost = opp?.winner && opp.winner !== m.teamId;
-                    return (
-                      <div key={i} style={{
-                        display: 'flex', alignItems: 'center', gap: 12,
-                        background: T.bgCard, borderRadius: 8, padding: '10px 14px',
-                        marginBottom: 6,
-                        border: `1px solid ${isWon ? T.gold : isLost ? 'rgba(199,72,74,0.3)' : T.rimSoft}`,
-                      }}>
-                        <div style={{ textAlign: 'center', minWidth: 52 }}>
-                          <div style={{ fontFamily: 'Oswald, sans-serif', fontSize: 18, fontWeight: 700, color: T.gold, lineHeight: 1 }}>{startTime}</div>
-                          <div style={{ fontFamily: 'Barlow Condensed, sans-serif', fontSize: 11, color: T.sage, letterSpacing: 1 }}>{m.slot.round}</div>
-                        </div>
-                        <div style={{ width: 1, height: 36, background: T.rim, flexShrink: 0 }} />
-                        <div style={{ flex: 1, minWidth: 0 }}>
-                          <div style={{ fontFamily: 'Barlow Condensed, sans-serif', fontSize: 11, color: T.sage, letterSpacing: 1, marginBottom: 2 }}>TABLE {m.tableNum}</div>
-                          <div style={{ fontFamily: 'Barlow Condensed, sans-serif', fontSize: 14, color: T.ivoryDim }}>
-                            vs <span style={{ color: T.ivory, fontWeight: 600 }}>{oppName}</span>
-                          </div>
-                        </div>
-                        {isWon && <div style={{ fontFamily: 'Oswald, sans-serif', fontSize: 11, color: T.gold, letterSpacing: 1 }}>WIN ✓</div>}
-                        {isLost && <div style={{ fontFamily: 'Oswald, sans-serif', fontSize: 11, color: T.red, letterSpacing: 1, opacity: 0.7 }}>LOSS</div>}
-                      </div>
-                    );
-                  })}
-                </div>
-              );
-            })}
-          </div>
-        )}
-      </div>
-
-      {/* ── Schedule grid (only show when not searching) ── */}
-      {!q && slots.map((slot, idx) => {
-        const isLive = live.status === 'live' && live.index === idx;
-        const isPast = (live.status === 'live' && idx < live.index) || live.status === 'finished';
-        const isNext = live.status === 'live' && live.index + 1 === idx;
-        const lines = slot.matchIds.map((mid, i) => ({ mid, tableNum: slot.tables[i] }))
-          .filter(({ mid }) => mid);
-        const hasAnyTeam = lines.some(({ mid }) => {
-          const m = data.matches[mid];
-          return m?.slots[0] || m?.slots[1];
-        });
         return (
-          <div key={idx} style={{
-            display: 'flex', alignItems: 'stretch',
-            borderBottom: `1px solid rgba(242,162,58,0.1)`,
-            background: isLive ? 'rgba(242,162,58,0.07)' : 'transparent',
-            opacity: isPast ? 0.4 : 1,
+          <div key={slotIdx} style={{
+            borderBottom: `1px solid rgba(242,162,58,0.12)`,
+            background: isLive ? 'rgba(242,162,58,0.06)' : 'transparent',
+            opacity: isPast ? 0.45 : 1,
           }}>
+            {/* Slot header row */}
             <div style={{
-              width: 80, flexShrink: 0, padding: '12px 10px 12px 14px',
-              borderRight: `2px solid ${isLive ? T.gold : isNext ? T.rimSoft : 'rgba(242,162,58,0.08)'}`,
-              display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: 3,
+              display: 'flex', alignItems: 'center', gap: 10,
+              padding: '8px 14px 6px',
+              borderBottom: `1px solid rgba(242,162,58,0.08)`,
+              borderLeft: `3px solid ${isLive ? T.gold : isNext ? T.sage : 'transparent'}`,
             }}>
-              {isLive && <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginBottom: 2 }}>
-                <span style={S.liveDot} />
-                <span style={{ fontFamily: 'Oswald, sans-serif', fontSize: 9, color: T.gold, letterSpacing: 1.5 }}>LIVE</span>
-              </div>}
-              {isNext && !isLive && <div style={{ fontFamily: 'Oswald, sans-serif', fontSize: 9, color: T.sage, letterSpacing: 1.5, marginBottom: 2 }}>UP NEXT</div>}
-              <div style={{ fontFamily: 'Oswald, sans-serif', fontWeight: 700, fontSize: 13, color: isLive ? T.gold : T.ivory, lineHeight: 1.2 }}>
+              {isLive && <span style={S.liveDot} />}
+              <span style={{ fontFamily: 'Oswald, sans-serif', fontWeight: 700, fontSize: 14, color: isLive ? T.gold : T.ivory, letterSpacing: 0.5 }}>
                 {slot.time.split('–')[0].trim()}
-              </div>
-              <div style={{ fontFamily: 'Barlow Condensed, sans-serif', fontSize: 10, color: T.sage, letterSpacing: 1 }}>
+              </span>
+              <span style={{ fontFamily: 'Barlow Condensed, sans-serif', fontSize: 11, color: T.sage, letterSpacing: 2 }}>
                 {slot.round}
-              </div>
+              </span>
+              {isNext && <span style={{ fontFamily: 'Oswald, sans-serif', fontSize: 10, color: T.sage, letterSpacing: 1.5, marginLeft: 'auto' }}>UP NEXT</span>}
             </div>
-            <div style={{ flex: 1, padding: '10px 14px', display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: 5 }}>
-              {hasAnyTeam
-                ? lines.map(({ mid, tableNum }) => (
-                    <ScheduleMatchLine key={mid} mid={mid} tableNum={tableNum} data={data} />
-                  ))
-                : <div style={{ fontFamily: 'Barlow Condensed, sans-serif', fontSize: 12, color: T.sage, letterSpacing: 1, opacity: 0.6 }}>
-                    BRACKET MATCHUPS · {slot.round}
+
+            {/* Table cards */}
+            <div style={{ display: 'flex', flexDirection: 'column' }}>
+              {[0, 1, 2].map(i => {
+                const mid = slot.matchIds[i];
+                const tableNum = slot.tables[i];
+                if (!mid) return null;
+                const match = data.matches[mid];
+                const t1 = match?.slots[0] ? data.teams[match.slots[0]] : null;
+                const t2 = match?.slots[1] ? data.teams[match.slots[1]] : null;
+                const n1 = t1 ? getTeamDisplayName(t1, data) : null;
+                const n2 = t2 ? getTeamDisplayName(t2, data) : null;
+                const w1 = match?.winner === match?.slots[0];
+                const w2 = match?.winner === match?.slots[1];
+                const done = !!match?.winner;
+                const actualTs = slot.tableStarts?.[i] ? new Date(slot.tableStarts[i]) : null;
+                const canStart = isAdmin && !actualTs && !done;
+
+                return (
+                  <div key={i} style={{
+                    display: 'flex', alignItems: 'center', gap: 0,
+                    padding: '9px 14px',
+                    borderBottom: i < 2 ? `1px solid rgba(242,162,58,0.06)` : 'none',
+                  }}>
+                    {/* Table label */}
+                    <div style={{
+                      fontFamily: 'Oswald, sans-serif', fontSize: 11, fontWeight: 700,
+                      color: T.gold, letterSpacing: 1, minWidth: 28, flexShrink: 0,
+                    }}>T{tableNum}</div>
+
+                    {/* Teams */}
+                    <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 6, minWidth: 0 }}>
+                      <span style={{
+                        fontFamily: 'Barlow Condensed, sans-serif', fontSize: 14, fontWeight: 600,
+                        color: done ? (w1 ? T.gold : T.sage) : T.ivory,
+                        overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                      }}>{n1 || '—'}</span>
+                      <span style={{ fontFamily: 'Barlow Condensed, sans-serif', fontSize: 11, color: T.sage, flexShrink: 0 }}>vs</span>
+                      <span style={{
+                        fontFamily: 'Barlow Condensed, sans-serif', fontSize: 14, fontWeight: 600,
+                        color: done ? (w2 ? T.gold : T.sage) : T.ivory,
+                        overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                      }}>{n2 || '—'}</span>
+                      {done && <span style={{ fontSize: 12, color: T.gold, flexShrink: 0 }}>✓</span>}
+                    </div>
+
+                    {/* Status / Start */}
+                    {actualTs && (
+                      <div style={{ fontFamily: 'Barlow Condensed, sans-serif', fontSize: 11, color: T.sage, flexShrink: 0, marginLeft: 8 }}>
+                        ● {actualTs.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', hour12: true })}
+                      </div>
+                    )}
+                    {canStart && (
+                      <button style={{
+                        marginLeft: 8, background: T.bgSoft, border: `1px solid ${T.rim}`,
+                        color: T.gold, fontFamily: 'Oswald, sans-serif', fontSize: 10,
+                        letterSpacing: 1, padding: '4px 10px', borderRadius: 4, cursor: 'pointer', flexShrink: 0,
+                      }} onClick={() => onSlotStart(slotIdx, i)}>
+                        START
+                      </button>
+                    )}
                   </div>
-              }
+                );
+              })}
             </div>
           </div>
         );
