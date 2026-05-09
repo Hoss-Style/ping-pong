@@ -140,17 +140,17 @@ const ROUNDS = [
 
 // Schedule: 7 waves × 3 tables; total 2 hours
 const SCHEDULE_SLOTS = [
-  { time: '4:30 – 4:42', duration: '12 min', round: 'PI',
+  { time: '4:30 – 4:45', duration: '15 min', round: 'PI',
     matchIds: ['L_PI', 'R_PI', 'L_R1_2'], tables: [1, 2, 3] },
-  { time: '4:45 – 4:57', duration: '12 min', round: 'R1',
+  { time: '4:45 – 5:00', duration: '15 min', round: 'R1',
     matchIds: ['L_R1_3', 'L_R1_4', 'R_R1_2'], tables: [1, 2, 3] },
-  { time: '5:00 – 5:12', duration: '12 min', round: 'R1',
+  { time: '5:00 – 5:15', duration: '15 min', round: 'R1',
     matchIds: ['L_R1_1', 'R_R1_3', 'R_R1_4'], tables: [1, 2, 3] },
-  { time: '5:15 – 5:27', duration: '12 min', round: 'R1/QF',
+  { time: '5:15 – 5:30', duration: '15 min', round: 'R1/QF',
     matchIds: ['R_R1_1', 'L_QF_2', 'R_QF_2'], tables: [1, 2, 3] },
-  { time: '5:30 – 5:42', duration: '12 min', round: 'QF',
+  { time: '5:30 – 5:45', duration: '15 min', round: 'QF',
     matchIds: ['L_QF_1', 'R_QF_1', null], tables: [1, 2, 'Warmup'] },
-  { time: '5:45 – 5:57', duration: '12 min', round: 'SF',
+  { time: '5:45 – 6:00', duration: '15 min', round: 'SF',
     matchIds: ['L_SF', 'R_SF', null], tables: [1, 2, 'Warmup'] },
   { time: '6:00 – 6:30', duration: '30 min', round: 'FINAL',
     matchIds: ['FINAL', null, null], tables: [1, 'Spectate', 'Spectate'] },
