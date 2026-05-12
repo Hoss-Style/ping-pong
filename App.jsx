@@ -995,6 +995,9 @@ export default function App() {
                 <div style={S.dropMenu}>
                   {/* TV views */}
                   <div style={S.dropSection}>DISPLAY</div>
+                  <button style={S.dropItem} className="drop-item-hover" onClick={() => { navigateView('landing'); setMenuOpen(false); }}>
+                    <span style={S.dropIcon}>🏠</span> Home
+                  </button>
                   <button style={S.dropItem} className="drop-item-hover" onClick={() => { navigateView('bracket'); setMenuOpen(false); }}>
                     <span style={S.dropIcon}>📺</span> Bracket TV
                   </button>
