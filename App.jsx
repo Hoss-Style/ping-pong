@@ -1032,7 +1032,7 @@ export default function App() {
           {tab === 'bracket' && (isDesktop ? (
             <DesktopBracketView
               data={data}
-              onTeamTap={isAdmin ? advanceWinner : undefined}
+              onTeamTap={isAdmin ? (matchId) => setScoreEditor({ matchId }) : undefined}
               onScoreEdit={isAdmin ? setScoreEditor : undefined}
               onShareMatch={setShareCard}
               locked={!isAdmin}
@@ -1042,7 +1042,7 @@ export default function App() {
               data={data}
               activeRound={activeRound}
               setActiveRound={setActiveRound}
-              onTeamTap={isAdmin ? advanceWinner : undefined}
+              onTeamTap={isAdmin ? (matchId) => setScoreEditor({ matchId }) : undefined}
               onSlotTap={isAdmin && !data.locked ? (teamId, slotIndex) => setPicker({ teamId, slotIndex }) : undefined}
               onRemovePlayer={isAdmin && !data.locked ? removePlayer : undefined}
               editTeamMode={editTeamMode}
