@@ -847,6 +847,10 @@ export default function App() {
         m.winner = winner; m.isForfeit = false;
         const flow = FLOW[matchId];
         if (flow) next.matches[flow.next].slots[flow.slot] = winner;
+      } else if (m.winner) {
+        // No winner from scores — clear the previously set winner and downstream
+        clearDownstream(next, matchId, m.winner);
+        m.winner = null;
       }
       return next;
     });
