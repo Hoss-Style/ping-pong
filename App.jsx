@@ -1864,13 +1864,24 @@ function DesktopMatchCard({ matchId, data, onTeamTap, onScoreEdit, onShareMatch,
     borderRadius: 10,
   } : {};
 
+  // For the final, show series score (e.g. "1–0") counting only played games.
+  // For regular matches, show score string only once winner is set.
+  const dividerScore = (() => {
+    if (isFinalCard) {
+      const played = (match.scores?.team1 || []).filter(g => g[0] > 0 || g[1] > 0);
+      if (!played.length) return '';
+      const t1w = played.filter(g => g[0] > g[1]).length;
+      const t2w = played.filter(g => g[1] > g[0]).length;
+      return `${t1w}–${t2w}`;
+    }
+    return match.winner ? matchScoreString(match) : '';
+  })();
+
   return (
     <div style={{ ...S.dmc, width, ...finalCardStyle }}>
       {renderSlot(0)}
       <div style={S.dmcDivider}>
-        {match.winner && matchScoreString(match) && (
-          <span style={S.dmcScore}>{matchScoreString(match)}</span>
-        )}
+        {dividerScore && <span style={S.dmcScore}>{dividerScore}</span>}
       </div>
       {renderSlot(1)}
     </div>
