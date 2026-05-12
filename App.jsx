@@ -3300,6 +3300,7 @@ function PrintSchedule({ data, onClose }) {
 
   return (
     <div style={S.printBackdrop}>
+      <style>{globalCSS}</style>
       <div style={{ maxWidth: printTab === 'bracket' ? 1060 : 900, margin: '0 auto', background: '#fff', color: '#1a1a1a', fontFamily: 'Arial, sans-serif' }}>
 
         {/* Top controls — hidden on print */}
