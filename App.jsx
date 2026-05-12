@@ -334,8 +334,8 @@ function computeStats(data) {
   });
   data.players.forEach(p => { playerStats[p.id] = { wins: 0, losses: 0, name: p.name }; });
 
-  let biggestUpset = null, closestMatch = null;
-  let totalMatches = 0, totalForfeits = 0, totalPoints = 0;
+  let biggestUpset = null, closestMatch = null, highestScoringMatch = null;
+  let totalMatches = 0, totalForfeits = 0, totalPoints = 0, scoredMatches = 0;
 
   Object.keys(data.matches).forEach(mid => {
     const m = data.matches[mid];
@@ -357,7 +357,14 @@ function computeStats(data) {
     const t2Pts = m.scores.team2.reduce((s, g) => s + (g[1] || 0), 0);
     teamStats[t1].pf += t1Pts; teamStats[t1].pa += t2Pts;
     teamStats[t2].pf += t2Pts; teamStats[t2].pa += t1Pts;
-    totalPoints += t1Pts + t2Pts;
+    const matchTotal = t1Pts + t2Pts;
+    if (matchTotal > 0) {
+      totalPoints += matchTotal;
+      scoredMatches++;
+      if (!highestScoringMatch || matchTotal > highestScoringMatch.totalPts) {
+        highestScoringMatch = { matchId: mid, totalPts: matchTotal, t1Pts, t2Pts, winnerId, loserId };
+      }
+    }
 
     const wSeed = data.teams[winnerId].seed, lSeed = data.teams[loserId].seed;
     if (wSeed > lSeed) {
@@ -373,7 +380,31 @@ function computeStats(data) {
     }
   });
 
-  return { teamStats, playerStats, biggestUpset, closestMatch, totalMatches, totalForfeits, totalPoints };
+  const avgPtsPerSide = scoredMatches > 0 ? (totalPoints / scoredMatches / 2).toFixed(1) : null;
+
+  // Undefeated teams (won at least 1, no losses)
+  const undefeated = Object.entries(teamStats)
+    .filter(([, s]) => s.wins > 0 && s.losses === 0)
+    .map(([id]) => ({ id, wins: teamStats[id].wins }))
+    .sort((a, b) => b.wins - a.wins);
+
+  // Most dominant by point differential
+  const dominantEntry = Object.entries(teamStats)
+    .filter(([, s]) => s.wins > 0 && (s.pf - s.pa) > 0)
+    .sort((a, b) => (b[1].pf - b[1].pa) - (a[1].pf - a[1].pa))[0];
+  const mostDominant = dominantEntry ? { id: dominantEntry[0], diff: dominantEntry[1].pf - dominantEntry[1].pa } : null;
+
+  // Win streak = wins in single-elim (each win = consecutive round)
+  const streakEntry = Object.entries(teamStats)
+    .filter(([, s]) => s.wins > 0)
+    .sort((a, b) => b[1].wins - a[1].wins)[0];
+  const winStreak = streakEntry ? { id: streakEntry[0], wins: streakEntry[1].wins } : null;
+
+  return {
+    teamStats, playerStats, biggestUpset, closestMatch, highestScoringMatch,
+    totalMatches, totalForfeits, totalPoints, avgPtsPerSide,
+    undefeated, mostDominant, winStreak,
+  };
 }
 
 function matchScoreString(match) {
@@ -2995,36 +3026,89 @@ function StatsView({ data }) {
       .slice(0, 8);
   }, [stats, data]);
 
+  const totalMatchesInBracket = Object.keys(data.matches).length;
+  const progressPct = totalMatchesInBracket > 0 ? Math.round((stats.totalMatches / totalMatchesInBracket) * 100) : 0;
+
+  if (stats.totalMatches === 0) {
+    return (
+      <div style={{ ...S.statsView, display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: 200 }}>
+        <div style={S.statsEmpty}>📊 Stats will appear as matches are played.</div>
+      </div>
+    );
+  }
+
   return (
     <div style={S.statsView}>
-      <div style={S.statsHeadline}>
-        <div style={S.statsCard}>
-          <div style={S.statsCardLabel}>MATCHES</div>
-          <div style={S.statsCardValue}>{stats.totalMatches}</div>
-          <div style={S.statsCardSub}>played</div>
+
+      {/* Pulse strip */}
+      <div style={S.statsPulse}>
+        <div style={S.statsPulseTile}>
+          <div style={S.statsPulseVal}>{stats.totalMatches}<span style={S.statsPulseDenom}>/{totalMatchesInBracket}</span></div>
+          <div style={S.statsPulseLabel}>MATCHES</div>
+          <div style={{ height: 3, borderRadius: 2, background: T.rim, marginTop: 6, overflow: 'hidden' }}>
+            <div style={{ height: '100%', width: `${progressPct}%`, background: T.gold, borderRadius: 2, transition: 'width 0.5s' }} />
+          </div>
         </div>
-        <div style={S.statsCard}>
-          <div style={S.statsCardLabel}>POINTS</div>
-          <div style={S.statsCardValue}>{stats.totalPoints}</div>
-          <div style={S.statsCardSub}>scored</div>
-        </div>
-        <div style={S.statsCard}>
-          <div style={S.statsCardLabel}>FORFEITS</div>
-          <div style={S.statsCardValue}>{stats.totalForfeits}</div>
-          <div style={S.statsCardSub}>walkovers</div>
-        </div>
+        {stats.avgPtsPerSide && (
+          <div style={S.statsPulseTile}>
+            <div style={S.statsPulseVal}>{stats.avgPtsPerSide}</div>
+            <div style={S.statsPulseLabel}>AVG PTS / SIDE</div>
+          </div>
+        )}
+        {stats.winStreak && (
+          <div style={S.statsPulseTile}>
+            <div style={S.statsPulseVal}>{stats.winStreak.wins}<span style={S.statsPulseDenom}> W</span></div>
+            <div style={S.statsPulseLabel}>BEST RUN</div>
+            <div style={S.statsPulseSub}>{(() => { const t = data.teams[stats.winStreak.id]; const p1 = data.players.find(p => p.id === t?.playerIds[0]); return p1?.name?.split(' ')[0] || t?.side + t?.seed; })()}</div>
+          </div>
+        )}
+        {stats.mostDominant && (
+          <div style={S.statsPulseTile}>
+            <div style={{ ...S.statsPulseVal, color: T.gold }}>+{stats.mostDominant.diff}</div>
+            <div style={S.statsPulseLabel}>TOP DIFF</div>
+            <div style={S.statsPulseSub}>{(() => { const t = data.teams[stats.mostDominant.id]; const p1 = data.players.find(p => p.id === t?.playerIds[0]); return p1?.name?.split(' ')[0] || t?.side + t?.seed; })()}</div>
+          </div>
+        )}
       </div>
 
+      {/* Undefeated callout */}
+      {stats.undefeated.length > 0 && (
+        <div style={S.statsSection}>
+          <div style={S.statsSectionTitle}>⚡ UNDEFEATED</div>
+          <div style={S.undefeatedGrid}>
+            {stats.undefeated.map(({ id, wins }) => {
+              const team = data.teams[id];
+              const p1 = data.players.find(p => p.id === team?.playerIds[0]);
+              const p2 = data.players.find(p => p.id === team?.playerIds[1]);
+              return (
+                <div key={id} style={S.undefeatedCard}>
+                  <div style={S.undefeatedSeed}>{team?.side}{team?.seed}</div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={S.undefeatedNames}>{p1?.name} / {p2?.name}</div>
+                  </div>
+                  <div style={S.undefeatedWins}>{wins}-0</div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* Hot takes */}
       <div style={S.statsSection}>
         <div style={S.statsSectionTitle}>🔥 HOT TAKES</div>
-        {stats.biggestUpset ? (
-          <UpsetCard upset={stats.biggestUpset} data={data} />
-        ) : (
-          <div style={S.statsEmpty}>Upsets will appear once seeded teams clash.</div>
+        <div style={S.hotGrid}>
+          {stats.biggestUpset && <UpsetCard upset={stats.biggestUpset} data={data} />}
+          {stats.closestMatch && <ClosestCard closest={stats.closestMatch} data={data} />}
+          {stats.highestScoringMatch && <HighScoreCard match={stats.highestScoringMatch} data={data} />}
+          {stats.mostDominant && <DominantCard dominant={stats.mostDominant} data={data} />}
+        </div>
+        {!stats.biggestUpset && !stats.closestMatch && (
+          <div style={S.statsEmpty}>More stats unlock as the bracket progresses.</div>
         )}
-        {stats.closestMatch && <ClosestCard closest={stats.closestMatch} data={data} />}
       </div>
 
+      {/* Leaderboards */}
       {playerLB.length > 0 && (
         <div style={S.statsSection}>
           <div style={S.statsSectionTitle}>🏆 TOP PLAYERS</div>
@@ -3040,7 +3124,7 @@ function StatsView({ data }) {
 
       {teamLB.length > 0 && (
         <div style={S.statsSection}>
-          <div style={S.statsSectionTitle}>🥇 TEAM LEADERBOARD</div>
+          <div style={S.statsSectionTitle}>🥇 TEAM STANDINGS</div>
           {teamLB.map((t, i) => {
             const p1 = data.players.find(p => p.id === t.team.playerIds[0]);
             const p2 = data.players.find(p => p.id === t.team.playerIds[1]);
@@ -3054,16 +3138,12 @@ function StatsView({ data }) {
                 </div>
                 <div style={S.lbRecord}>
                   {t.wins}W · {t.losses}L
-                  <div style={S.lbDiff}>{diff >= 0 ? '+' : ''}{diff}</div>
+                  <div style={{ ...S.lbDiff, color: diff > 0 ? T.gold : diff < 0 ? '#E07070' : T.ivoryDim }}>{diff >= 0 ? '+' : ''}{diff}</div>
                 </div>
               </div>
             );
           })}
         </div>
-      )}
-
-      {playerLB.length === 0 && (
-        <div style={S.statsEmpty}>📊 Stats will appear as matches are played.</div>
       )}
     </div>
   );
@@ -3095,14 +3175,42 @@ function UpsetCard({ upset, data }) {
 function ClosestCard({ closest, data }) {
   const m = data.matches[closest.matchId];
   const t1 = data.teams[m.slots[0]], t2 = data.teams[m.slots[1]];
+  const p1 = data.players.find(p => p.id === t1?.playerIds[0]);
+  const p2 = data.players.find(p => p.id === t2?.playerIds[0]);
   return (
     <div style={S.hotCard}>
       <div style={S.hotLabel}>TIGHTEST MATCH</div>
-      <div style={S.hotWin}>
-        SEED {t1?.seed} <span style={S.hotVerb}>vs</span> SEED {t2?.seed}
-      </div>
-      <div style={S.hotMeta}>Won by {closest.margin} · {matchLabel(closest.matchId)}</div>
+      <div style={S.hotWin}>{p1?.name?.split(' ')[0] || `S${t1?.seed}`} <span style={{ color: T.rim }}>vs</span> {p2?.name?.split(' ')[0] || `S${t2?.seed}`}</div>
       <div style={S.hotScore}>{matchScoreString(m)}</div>
+      <div style={S.hotMeta}>Won by {closest.margin} pt{closest.margin !== 1 ? 's' : ''} · {matchLabel(closest.matchId)}</div>
+    </div>
+  );
+}
+
+function HighScoreCard({ match, data }) {
+  const t1 = data.teams[match.winnerId], t2 = data.teams[match.loserId];
+  const p1 = data.players.find(p => p.id === t1?.playerIds[0]);
+  const p2 = data.players.find(p => p.id === t2?.playerIds[0]);
+  return (
+    <div style={S.hotCard}>
+      <div style={S.hotLabel}>HIGHEST SCORING</div>
+      <div style={S.hotWin}>{p1?.name?.split(' ')[0] || `S${t1?.seed}`} <span style={{ color: T.rim }}>vs</span> {p2?.name?.split(' ')[0] || `S${t2?.seed}`}</div>
+      <div style={{ fontFamily: "'Oswald', sans-serif", fontSize: 22, fontWeight: 700, color: T.gold, letterSpacing: 1, margin: '4px 0 2px' }}>{match.totalPts} <span style={{ fontSize: 11, opacity: 0.6, fontWeight: 400 }}>PTS</span></div>
+      <div style={S.hotMeta}>{match.t1Pts}–{match.t2Pts} · {matchLabel(match.matchId)}</div>
+    </div>
+  );
+}
+
+function DominantCard({ dominant, data }) {
+  const team = data.teams[dominant.id];
+  const p1 = data.players.find(p => p.id === team?.playerIds[0]);
+  const p2 = data.players.find(p => p.id === team?.playerIds[1]);
+  return (
+    <div style={S.hotCard}>
+      <div style={S.hotLabel}>MOST DOMINANT</div>
+      <div style={S.hotWin}>{p1?.name?.split(' ')[0]} / {p2?.name?.split(' ')[0]}</div>
+      <div style={{ fontFamily: "'Oswald', sans-serif", fontSize: 22, fontWeight: 700, color: T.gold, letterSpacing: 1, margin: '4px 0 2px' }}>+{dominant.diff} <span style={{ fontSize: 11, opacity: 0.6, fontWeight: 400 }}>PT DIFF</span></div>
+      <div style={S.hotMeta}>{team?.side}{team?.seed}</div>
     </div>
   );
 }
@@ -4631,32 +4739,42 @@ const S = {
 
   // STATS
   statsView: { padding: '12px 12px 16px' },
-  statsHeadline: { display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8, marginBottom: 16 },
-  statsCard: {
-    padding: '12px 8px',
-    background: 'rgba(212,165,75,0.06)', border: `1px solid ${T.rim}`, borderRadius: 6,
-    textAlign: 'center',
+
+  statsPulse: { display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 8, marginBottom: 18 },
+  statsPulseTile: {
+    padding: '12px 10px 10px', textAlign: 'center',
+    background: 'rgba(212,165,75,0.05)', border: `1px solid ${T.rim}`, borderRadius: 8,
   },
-  statsCardLabel: { fontFamily: "'Oswald', sans-serif", fontSize: 9, fontWeight: 600, letterSpacing: 1.5, color: T.gold, marginBottom: 4 },
-  statsCardValue: { fontFamily: "'Oswald', sans-serif", fontSize: 26, fontWeight: 700, color: T.ivory },
-  statsCardSub: { fontFamily: "'Barlow Condensed', sans-serif", fontSize: 10, color: 'rgba(245,238,220,0.5)', marginTop: 2 },
+  statsPulseVal: { fontFamily: "'Oswald', sans-serif", fontSize: 28, fontWeight: 700, color: T.ivory, lineHeight: 1 },
+  statsPulseDenom: { fontSize: 14, fontWeight: 400, opacity: 0.5 },
+  statsPulseLabel: { fontFamily: "'Oswald', sans-serif", fontSize: 8, fontWeight: 700, letterSpacing: 2, color: T.gold, marginTop: 5 },
+  statsPulseSub: { fontFamily: "'Barlow Condensed', sans-serif", fontSize: 11, color: T.ivoryDim, marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
 
   statsSection: { marginBottom: 18 },
-  statsSectionTitle: { fontFamily: "'Oswald', sans-serif", fontSize: 13, fontWeight: 700, letterSpacing: 2, color: T.gold, marginBottom: 8 },
+  statsSectionTitle: { fontFamily: "'Oswald', sans-serif", fontSize: 11, fontWeight: 700, letterSpacing: 2.5, color: T.gold, marginBottom: 8 },
   statsEmpty: { padding: 14, textAlign: 'center', color: 'rgba(245,238,220,0.5)', fontFamily: "'Barlow Condensed', sans-serif", fontSize: 12, background: 'rgba(212,165,75,0.04)', border: `1px solid ${T.rim}`, borderRadius: 6 },
 
+  hotGrid: { display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 8 },
   hotCard: {
-    padding: 14,
-    background: 'rgba(212,165,75,0.06)', border: `1px solid ${T.rim}`, borderRadius: 6,
-    marginBottom: 8,
+    padding: '12px 14px',
+    background: 'rgba(212,165,75,0.05)', border: `1px solid ${T.rim}`, borderRadius: 8,
   },
-  hotLabel: { fontFamily: "'Oswald', sans-serif", fontSize: 10, fontWeight: 700, letterSpacing: 2, color: T.gold, marginBottom: 8 },
-  hotWin: { fontFamily: "'Oswald', sans-serif", fontSize: 14, color: T.ivory, marginBottom: 4 },
+  hotLabel: { fontFamily: "'Oswald', sans-serif", fontSize: 8, fontWeight: 700, letterSpacing: 2, color: T.gold, marginBottom: 6, opacity: 0.8 },
+  hotWin: { fontFamily: "'Oswald', sans-serif", fontSize: 13, color: T.ivory, fontWeight: 600 },
   hotVerb: { fontFamily: "'Barlow Condensed', sans-serif", fontSize: 11, color: 'rgba(245,238,220,0.5)', fontStyle: 'italic', marginBottom: 4 },
-  hotLose: { fontFamily: "'Oswald', sans-serif", fontSize: 13, color: 'rgba(245,238,220,0.7)' },
+  hotLose: { fontFamily: "'Oswald', sans-serif", fontSize: 12, color: 'rgba(245,238,220,0.6)' },
   hotSeed: { fontFamily: "'Oswald', sans-serif", fontSize: 9, fontWeight: 700, letterSpacing: 1, color: T.gold, marginLeft: 6, padding: '2px 6px', background: 'rgba(212,165,75,0.18)', borderRadius: 2 },
-  hotMeta: { fontFamily: "'Barlow Condensed', sans-serif", fontSize: 10, color: 'rgba(245,238,220,0.5)', marginTop: 6 },
-  hotScore: { fontFamily: "'Oswald', sans-serif", fontSize: 12, color: T.goldBr, marginTop: 6 },
+  hotMeta: { fontFamily: "'Barlow Condensed', sans-serif", fontSize: 10, color: 'rgba(245,238,220,0.4)', marginTop: 5 },
+  hotScore: { fontFamily: "'Oswald', sans-serif", fontSize: 12, color: T.goldBr, marginTop: 4, fontWeight: 700 },
+
+  undefeatedGrid: { display: 'flex', flexDirection: 'column', gap: 6 },
+  undefeatedCard: {
+    display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px',
+    background: 'rgba(212,165,75,0.1)', border: `1px solid rgba(212,165,75,0.4)`, borderRadius: 7,
+  },
+  undefeatedSeed: { fontFamily: "'Oswald', sans-serif", fontSize: 11, fontWeight: 700, color: T.bgDeep, background: T.gold, padding: '2px 8px', borderRadius: 3, flexShrink: 0 },
+  undefeatedNames: { fontFamily: "'Oswald', sans-serif", fontSize: 13, color: T.ivory, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
+  undefeatedWins: { fontFamily: "'Oswald', sans-serif", fontSize: 14, fontWeight: 700, color: T.gold, flexShrink: 0 },
 
   lbRow: {
     display: 'flex', alignItems: 'center', gap: 10,
