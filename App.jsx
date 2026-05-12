@@ -723,6 +723,19 @@ export default function App() {
     });
   };
 
+  const deletePlayer = (playerId) => {
+    setData(prev => {
+      const next = cloneData(prev);
+      // Remove from any team slot
+      Object.values(next.teams).forEach(team => {
+        team.playerIds = team.playerIds.map(id => id === playerId ? null : id);
+      });
+      // Remove from players list
+      next.players = next.players.filter(p => p.id !== playerId);
+      return next;
+    });
+  };
+
   const removePlayer = (teamId, slotIndex) => {
     setData(prev => {
       const next = cloneData(prev);
@@ -1153,6 +1166,7 @@ export default function App() {
                 next.alternates = (next.alternates || []).filter(a => a.id !== altId);
                 setData(next);
               } : undefined}
+              onDeletePlayer={isAdmin && !data.locked ? deletePlayer : undefined}
               onAssignAlternate={isAdmin ? (altId, teamId, slotIndex) => {
                 const next = cloneData(data);
                 const alt = (next.alternates || []).find(a => a.id === altId);
@@ -2352,7 +2366,7 @@ function SlotMatch({ matchId, tableNum, data, isLast, isAdmin, canStart, actualT
 // ═══════════════════════════════════════════════════════════════════════════
 function PlayersView({ data, isAdmin, editingPlayer, setEditingPlayer, updatePlayerName,
                        getPlayerTeam, onPlayerSchedule, onSlotTap, onTeamNameEdit,
-                       onAddAlternate, onRemoveAlternate, onAssignAlternate }) {
+                       onAddAlternate, onRemoveAlternate, onAssignAlternate, onDeletePlayer }) {
   const [subTab, setSubTab] = useState('teams');
   const [newAltName, setNewAltName] = useState('');
 
@@ -2418,6 +2432,7 @@ function PlayersView({ data, isAdmin, editingPlayer, setEditingPlayer, updatePla
               onEditEnd={() => setEditingPlayer(null)}
               onSave={(name) => { updatePlayerName(player.id, name); setEditingPlayer(null); }}
               onShowSchedule={() => onPlayerSchedule(player.id)}
+              onDelete={onDeletePlayer ? () => onDeletePlayer(player.id) : undefined}
             />
           ))}
         </div>
@@ -2523,8 +2538,9 @@ function AltRow({ alt, isAdmin, onRemove }) {
   );
 }
 
-function PlayerRow({ player, num, team, isEditing, onEditStart, onEditEnd, onSave, onShowSchedule }) {
+function PlayerRow({ player, num, team, isEditing, onEditStart, onEditEnd, onSave, onShowSchedule, onDelete }) {
   const [draft, setDraft] = useState(player.name);
+  const [confirmDelete, setConfirmDelete] = useState(false);
   const inputRef = useRef(null);
 
   useEffect(() => {
@@ -2555,6 +2571,24 @@ function PlayerRow({ player, num, team, isEditing, onEditStart, onEditEnd, onSav
     );
   }
 
+  if (confirmDelete) {
+    return (
+      <div style={{ ...S.playerRow, background: 'rgba(224,112,112,0.08)', border: '1px solid rgba(224,112,112,0.3)', borderRadius: 5 }}>
+        <div style={{ flex: 1, fontFamily: "'Oswald', sans-serif", fontSize: 12, color: '#E07070', letterSpacing: 0.5 }}>
+          Remove {player.name}?
+        </div>
+        <button onClick={() => { onDelete(); setConfirmDelete(false); }}
+          style={{ fontFamily: "'Oswald', sans-serif", fontSize: 11, fontWeight: 700, letterSpacing: 1, color: '#fff', background: '#c0392b', border: 'none', borderRadius: 4, padding: '5px 12px', cursor: 'pointer', marginRight: 6 }}>
+          DELETE
+        </button>
+        <button onClick={() => setConfirmDelete(false)}
+          style={{ fontFamily: "'Oswald', sans-serif", fontSize: 11, color: 'rgba(245,238,220,0.5)', background: 'transparent', border: '1px solid rgba(245,238,220,0.15)', borderRadius: 4, padding: '5px 10px', cursor: 'pointer' }}>
+          CANCEL
+        </button>
+      </div>
+    );
+  }
+
   return (
     <div style={S.playerRow}>
       <div style={S.playerNum}>{num}</div>
@@ -2569,6 +2603,10 @@ function PlayerRow({ player, num, team, isEditing, onEditStart, onEditEnd, onSav
       {team && (
         <button style={S.playerScheduleBtn}
           onClick={(e) => { e.stopPropagation(); onShowSchedule(); }}>📅</button>
+      )}
+      {onDelete && (
+        <button style={S.playerDeleteBtn}
+          onClick={(e) => { e.stopPropagation(); setConfirmDelete(true); }}>✕</button>
       )}
     </div>
   );
@@ -4489,6 +4527,11 @@ const S = {
     width: 32, height: 32, background: 'rgba(212,165,75,0.08)',
     border: `1px solid ${T.rim}`, borderRadius: 4, cursor: 'pointer',
     fontSize: 14, color: T.gold, padding: 0,
+  },
+  playerDeleteBtn: {
+    width: 28, height: 28, background: 'transparent',
+    border: `1px solid rgba(224,112,112,0.25)`, borderRadius: 4, cursor: 'pointer',
+    fontSize: 11, color: 'rgba(224,112,112,0.6)', padding: 0, flexShrink: 0,
   },
 
   // SHEETS
