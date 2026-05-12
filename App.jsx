@@ -597,12 +597,12 @@ export default function App() {
   const [shareCard, setShareCard] = useState(null);
   const [playerSchedule, setPlayerSchedule] = useState(null);
   const [tableFilter, setTableFilter] = useState('all');
-  const [urlView, setUrlView] = useState(() => new URLSearchParams(window.location.search).get('view') || '');
+  const [urlView, setUrlView] = useState(() => new URLSearchParams(window.location.search).get('view') || 'landing');
   const [printMode, setPrintMode] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
 
   const navigateView = (view) => {
-    const url = view ? `?view=${view}` : window.location.pathname;
+    const url = view ? `?view=${view}` : `${window.location.pathname}?view=app`;
     window.history.pushState({}, '', url);
     setUrlView(view);
   };
