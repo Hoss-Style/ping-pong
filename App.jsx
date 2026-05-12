@@ -2624,6 +2624,8 @@ function ScoreEditor({ data, matchId, onClose, onSave, onForfeit }) {
   const numGames = isFinal ? 3 : 1;
   const formatLabel = isFinal ? 'BEST OF 3 TO 21' : '1 GAME TO 21';
 
+  const [activeGame, setActiveGame] = useState(0);
+
   // games[i] = [t1_score_str, t2_score_str] — strings so empty field shows blank, not "0"
   const [games, setGames] = useState(() => {
     if (match.scores.team1.length > 0) {
@@ -2656,51 +2658,125 @@ function ScoreEditor({ data, matchId, onClose, onSave, onForfeit }) {
     onSave(matchId, t1Scores, t2Scores);
   };
 
+  const renderGameSlots = (gameIdx) => {
+    const game = games[gameIdx];
+    const t1Win = n(game[0]) > n(game[1]) && (game[0] !== '' || game[1] !== '');
+    const t2Win = n(game[1]) > n(game[0]) && (game[0] !== '' || game[1] !== '');
+    return (
+      <div style={S.scoreGameInputs}>
+        {[
+          { team: team1, pa: p1a, pb: p1b, val: game[0], idx: 0, isWin: t1Win },
+          { team: team2, pa: p2a, pb: p2b, val: game[1], idx: 1, isWin: t2Win },
+        ].map(({ team, pa, pb, val, idx, isWin }) => (
+          <div key={idx} style={{ ...S.scoreTeamCol, ...(isWin ? S.scoreTeamColWin : {}) }}>
+            <div style={S.scoreTeamSeed}>{team.side}{team.seed}</div>
+            <div style={S.scoreTeamPlayers}>
+              <div>{pa?.name || '…'}</div>
+              <div style={{ opacity: 0.7 }}>{pb?.name || '…'}</div>
+            </div>
+            <input type="text" inputMode="numeric" pattern="[0-9]*" value={val}
+              placeholder="0"
+              onChange={e => setScore(gameIdx, idx, e.target.value.replace(/\D/g, ''))}
+              onFocus={e => e.target.select()}
+              style={{ ...S.scoreInput, ...(isWin ? S.scoreInputWin : {}) }} />
+            {isWin && <div style={S.scoreWinTag}>WIN</div>}
+          </div>
+        ))}
+      </div>
+    );
+  };
+
   return (
     <div style={S.modalBackdrop} onClick={onClose}>
-      <div style={S.scoreModal} onClick={e => e.stopPropagation()}>
+      <div style={{ ...S.scoreModal, ...(isFinal ? { maxWidth: 500 } : {}) }} onClick={e => e.stopPropagation()}>
+        {/* Header */}
         <div style={S.scoreHeader}>
           <div>
-            <div style={S.sheetTitle}>ENTER SCORES</div>
+            <div style={S.sheetTitle}>{isFinal ? 'CHAMPIONSHIP' : 'ENTER SCORES'}</div>
             <div style={S.scoreFormat}>{formatLabel}</div>
           </div>
           <button style={S.sheetClose} onClick={onClose}>×</button>
         </div>
 
-        <div style={S.scoreBody}>
-          {games.map((game, i) => {
-            const t1Win = game[0] > game[1];
-            const t2Win = game[1] > game[0];
-            return (
-              <div key={i}>
-                {numGames > 1 && <div style={S.gameLabel}>GAME {i + 1}</div>}
-                <div style={S.scoreGameInputs}>
-                  {[
-                    { team: team1, pa: p1a, pb: p1b, val: game[0], idx: 0, isWin: t1Win },
-                    { team: team2, pa: p2a, pb: p2b, val: game[1], idx: 1, isWin: t2Win },
-                  ].map(({ team, pa, pb, val, idx, isWin }) => (
-                    <div key={idx} style={{
-                      ...S.scoreTeamCol,
-                      ...(isWin ? S.scoreTeamColWin : {}),
-                    }}>
-                      <div style={S.scoreTeamSeed}>{team.side}{team.seed}</div>
-                      <div style={S.scoreTeamPlayers}>
-                        <div>{pa?.name || '…'}</div>
-                        <div style={{ opacity: 0.7 }}>{pb?.name || '…'}</div>
-                      </div>
-                      <input type="text" inputMode="numeric" pattern="[0-9]*" value={val}
-                        placeholder="0"
-                        onChange={e => setScore(i, idx, e.target.value.replace(/\D/g, ''))}
-                        onFocus={e => e.target.select()}
-                        style={{ ...S.scoreInput, ...(isWin ? S.scoreInputWin : {}) }} />
-                      {isWin && <div style={S.scoreWinTag}>WIN</div>}
-                    </div>
-                  ))}
+        {isFinal ? (
+          <>
+            {/* Series score banner */}
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 0, padding: '14px 20px 0', borderBottom: `1px solid ${T.rim}` }}>
+              {/* Team 1 */}
+              <div style={{ flex: 1, textAlign: 'right' }}>
+                <div style={{ fontFamily: "'Oswald', sans-serif", fontSize: 11, fontWeight: 700, letterSpacing: 1.5, color: t1Wins > t2Wins ? T.gold : T.ivoryDim, opacity: 0.9 }}>
+                  {team1.side}{team1.seed}
+                </div>
+                <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 13, color: T.ivory, lineHeight: 1.2 }}>
+                  {p1a?.name || '—'}
+                </div>
+                <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 13, color: T.ivory, opacity: 0.6 }}>
+                  {p1b?.name || ''}
                 </div>
               </div>
-            );
-          })}
-        </div>
+              {/* Series score */}
+              <div style={{ padding: '0 20px', textAlign: 'center' }}>
+                <div style={{ fontFamily: "'Oswald', sans-serif", fontSize: 40, fontWeight: 700, letterSpacing: 4, color: T.gold, lineHeight: 1 }}>
+                  {t1Wins} <span style={{ color: T.rim, fontSize: 28 }}>–</span> {t2Wins}
+                </div>
+                <div style={{ fontFamily: "'Oswald', sans-serif", fontSize: 9, letterSpacing: 2, color: T.ivoryDim, marginTop: 2 }}>SERIES</div>
+              </div>
+              {/* Team 2 */}
+              <div style={{ flex: 1, textAlign: 'left' }}>
+                <div style={{ fontFamily: "'Oswald', sans-serif", fontSize: 11, fontWeight: 700, letterSpacing: 1.5, color: t2Wins > t1Wins ? T.gold : T.ivoryDim, opacity: 0.9 }}>
+                  {team2.side}{team2.seed}
+                </div>
+                <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 13, color: T.ivory, lineHeight: 1.2 }}>
+                  {p2a?.name || '—'}
+                </div>
+                <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 13, color: T.ivory, opacity: 0.6 }}>
+                  {p2b?.name || ''}
+                </div>
+              </div>
+            </div>
+
+            {/* Game tabs */}
+            <div style={{ display: 'flex', borderBottom: `1px solid ${T.rim}`, background: 'rgba(0,0,0,0.15)' }}>
+              {games.map((game, i) => {
+                const hasScore = game[0] !== '' || game[1] !== '';
+                const gT1Win = n(game[0]) > n(game[1]) && hasScore;
+                const gT2Win = n(game[1]) > n(game[0]) && hasScore;
+                const isActive = activeGame === i;
+                return (
+                  <button key={i} onClick={() => setActiveGame(i)} style={{
+                    flex: 1, padding: '10px 4px 9px',
+                    background: 'transparent', border: 'none', cursor: 'pointer',
+                    borderBottom: isActive ? `2px solid ${T.gold}` : '2px solid transparent',
+                    display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3,
+                    transition: 'border-color 0.15s',
+                  }}>
+                    <div style={{ fontFamily: "'Oswald', sans-serif", fontSize: 9, fontWeight: 700, letterSpacing: 2, color: isActive ? T.gold : T.ivoryDim }}>
+                      GAME {i + 1}
+                    </div>
+                    {hasScore ? (
+                      <div style={{ fontFamily: "'Oswald', sans-serif", fontSize: 13, fontWeight: 700, color: isActive ? T.ivory : T.ivoryDim, letterSpacing: 1 }}>
+                        <span style={{ color: gT1Win ? T.gold : 'inherit' }}>{game[0]}</span>
+                        <span style={{ color: T.rim, margin: '0 3px' }}>–</span>
+                        <span style={{ color: gT2Win ? T.gold : 'inherit' }}>{game[1]}</span>
+                      </div>
+                    ) : (
+                      <div style={{ fontFamily: "'Oswald', sans-serif", fontSize: 11, color: T.rim }}>· · ·</div>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* Active game input */}
+            <div style={{ padding: '16px 20px' }}>
+              {renderGameSlots(activeGame)}
+            </div>
+          </>
+        ) : (
+          <div style={S.scoreBody}>
+            {renderGameSlots(0)}
+          </div>
+        )}
 
         <div style={S.scoreActions}>
           <button style={S.scoreSaveBtn} onClick={handleSave}>
