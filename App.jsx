@@ -1558,9 +1558,19 @@ function DesktopBracketView({ data, onTeamTap, onScoreEdit, onShareMatch, locked
   const Y = c => PAD + c;
   const lp = { stroke: T.gold, strokeWidth: 1.5, opacity: 0.35, strokeLinecap: 'round' };
 
-  // Helper to generate a bracket pair connector
+  // Left-side connector: junction is HG/2 to the RIGHT of x1 (in the gap between columns)
   const pairLines = (prefix, x1, x2, ya, yb, ymid) => {
     const xm = x1 + HG / 2;
+    return [
+      <line key={`${prefix}a`} x1={x1} y1={ya}   x2={xm} y2={ya}   {...lp} />,
+      <line key={`${prefix}b`} x1={x1} y1={yb}   x2={xm} y2={yb}   {...lp} />,
+      <line key={`${prefix}v`} x1={xm} y1={ya}   x2={xm} y2={yb}   {...lp} />,
+      <line key={`${prefix}m`} x1={xm} y1={ymid} x2={x2} y2={ymid} {...lp} />,
+    ];
+  };
+  // Right-side connector: junction is HG/2 to the LEFT of x1 (mirror of above)
+  const pairLinesR = (prefix, x1, x2, ya, yb, ymid) => {
+    const xm = x1 - HG / 2;
     return [
       <line key={`${prefix}a`} x1={x1} y1={ya}   x2={xm} y2={ya}   {...lp} />,
       <line key={`${prefix}b`} x1={x1} y1={yb}   x2={xm} y2={yb}   {...lp} />,
@@ -1571,23 +1581,23 @@ function DesktopBracketView({ data, onTeamTap, onScoreEdit, onShareMatch, locked
 
   const svgLines = [
     // Left PI → R1_1
-    <line key="l-pi" x1={C.piX+MW} y1={Y(rc[0])} x2={C.r1X}    y2={Y(rc[0])} {...lp} />,
+    <line key="l-pi" x1={C.piX+MW}  y1={Y(rc[0])} x2={C.r1X}       y2={Y(rc[0])} {...lp} />,
     // Left R1 → QF
     ...pairLines('l-r1a', C.r1X+MW,    C.qfX,      Y(rc[0]), Y(rc[1]), Y(qc[0])),
     ...pairLines('l-r1b', C.r1X+MW,    C.qfX,      Y(rc[2]), Y(rc[3]), Y(qc[1])),
     // Left QF → SF
     ...pairLines('l-qf',  C.qfX+MW,    C.sfX,      Y(qc[0]), Y(qc[1]), Y(sc)),
     // Left SF → Final
-    <line key="l-sf" x1={C.sfX+MW}  y1={Y(sc)}  x2={C.finX}  y2={Y(sc)}  {...lp} />,
+    <line key="l-sf"  x1={C.sfX+MW}  y1={Y(sc)}   x2={C.finX}       y2={Y(sc)}   {...lp} />,
     // Right SF → Final
-    <line key="r-sf" x1={C.finX+MW} y1={Y(sc)}  x2={C.rsfX}  y2={Y(sc)}  {...lp} />,
-    // Right QF → SF (connectors on left of QF, toward rsfX right edge)
-    ...pairLines('r-qf',  C.rqfX,      C.rsfX+MW,  Y(qc[0]), Y(qc[1]), Y(sc)),
-    // Right R1 → QF (connectors on left of R1, toward rqfX right edge)
-    ...pairLines('r-r1a', C.rr1X,      C.rqfX+MW,  Y(rc[0]), Y(rc[1]), Y(qc[0])),
-    ...pairLines('r-r1b', C.rr1X,      C.rqfX+MW,  Y(rc[2]), Y(rc[3]), Y(qc[1])),
+    <line key="r-sf"  x1={C.rsfX}    y1={Y(sc)}   x2={C.finX+MW}    y2={Y(sc)}   {...lp} />,
+    // Right QF → SF
+    ...pairLinesR('r-qf',  C.rqfX,      C.rsfX+MW,  Y(qc[0]), Y(qc[1]), Y(sc)),
+    // Right R1 → QF
+    ...pairLinesR('r-r1a', C.rr1X,      C.rqfX+MW,  Y(rc[0]), Y(rc[1]), Y(qc[0])),
+    ...pairLinesR('r-r1b', C.rr1X,      C.rqfX+MW,  Y(rc[2]), Y(rc[3]), Y(qc[1])),
     // Right PI → R1_1
-    <line key="r-pi" x1={C.rr1X+MW} y1={Y(rc[0])} x2={C.rpiX} y2={Y(rc[0])} {...lp} />,
+    <line key="r-pi"  x1={C.rpiX}    y1={Y(rc[0])} x2={C.rr1X+MW}   y2={Y(rc[0])} {...lp} />,
   ];
 
   const mc = (matchId, x, top, isFinalCard = false) => (
@@ -1701,18 +1711,27 @@ function TVBracketView({ data }) {
       <line key={`${prefix}m`} x1={xm} y1={ymid} x2={x2} y2={ymid} {...lp} />,
     ];
   };
+  const pairLinesR = (prefix, x1, x2, ya, yb, ymid) => {
+    const xm = x1 - HG / 2;
+    return [
+      <line key={`${prefix}a`} x1={x1} y1={ya}   x2={xm} y2={ya}   {...lp} />,
+      <line key={`${prefix}b`} x1={x1} y1={yb}   x2={xm} y2={yb}   {...lp} />,
+      <line key={`${prefix}v`} x1={xm} y1={ya}   x2={xm} y2={yb}   {...lp} />,
+      <line key={`${prefix}m`} x1={xm} y1={ymid} x2={x2} y2={ymid} {...lp} />,
+    ];
+  };
 
   const svgLines = [
-    <line key="l-pi"  x1={C.piX+MW}   y1={Y(rc[0])} x2={C.r1X}       y2={Y(rc[0])} {...lp} />,
-    ...pairLines('l-r1a', C.r1X+MW,    C.qfX,         Y(rc[0]), Y(rc[1]), Y(qc[0])),
-    ...pairLines('l-r1b', C.r1X+MW,    C.qfX,         Y(rc[2]), Y(rc[3]), Y(qc[1])),
-    ...pairLines('l-qf',  C.qfX+MW,    C.sfX,         Y(qc[0]), Y(qc[1]), Y(sc)),
-    <line key="l-sf"  x1={C.sfX+MW}   y1={Y(sc)}    x2={C.finX}      y2={Y(sc)}    {...lp} />,
-    <line key="r-sf"  x1={C.finX+MW_F} y1={Y(sc)}   x2={C.rsfX}      y2={Y(sc)}    {...lp} />,
-    ...pairLines('r-qf',  C.rqfX,       C.rsfX+MW,    Y(qc[0]), Y(qc[1]), Y(sc)),
-    ...pairLines('r-r1a', C.rr1X,       C.rqfX+MW,    Y(rc[0]), Y(rc[1]), Y(qc[0])),
-    ...pairLines('r-r1b', C.rr1X,       C.rqfX+MW,    Y(rc[2]), Y(rc[3]), Y(qc[1])),
-    <line key="r-pi"  x1={C.rr1X+MW}  y1={Y(rc[0])} x2={C.rpiX}      y2={Y(rc[0])} {...lp} />,
+    <line key="l-pi"  x1={C.piX+MW}    y1={Y(rc[0])} x2={C.r1X}        y2={Y(rc[0])} {...lp} />,
+    ...pairLines( 'l-r1a', C.r1X+MW,    C.qfX,         Y(rc[0]), Y(rc[1]), Y(qc[0])),
+    ...pairLines( 'l-r1b', C.r1X+MW,    C.qfX,         Y(rc[2]), Y(rc[3]), Y(qc[1])),
+    ...pairLines( 'l-qf',  C.qfX+MW,    C.sfX,         Y(qc[0]), Y(qc[1]), Y(sc)),
+    <line key="l-sf"  x1={C.sfX+MW}    y1={Y(sc)}    x2={C.finX}        y2={Y(sc)}    {...lp} />,
+    <line key="r-sf"  x1={C.rsfX}      y1={Y(sc)}    x2={C.finX+MW_F}   y2={Y(sc)}    {...lp} />,
+    ...pairLinesR('r-qf',  C.rqfX,       C.rsfX+MW,    Y(qc[0]), Y(qc[1]), Y(sc)),
+    ...pairLinesR('r-r1a', C.rr1X,       C.rqfX+MW,    Y(rc[0]), Y(rc[1]), Y(qc[0])),
+    ...pairLinesR('r-r1b', C.rr1X,       C.rqfX+MW,    Y(rc[2]), Y(rc[3]), Y(qc[1])),
+    <line key="r-pi"  x1={C.rpiX}      y1={Y(rc[0])} x2={C.rr1X+MW}     y2={Y(rc[0])} {...lp} />,
   ];
 
   const mc  = (mid, x, top) => (
