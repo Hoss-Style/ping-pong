@@ -2661,8 +2661,9 @@ function ScoreEditor({ data, matchId, onClose, onSave, onForfeit }) {
 
   const renderGameSlots = (gameIdx) => {
     const game = games[gameIdx];
-    const t1Win = n(game[0]) > n(game[1]) && (game[0] !== '' || game[1] !== '');
-    const t2Win = n(game[1]) > n(game[0]) && (game[0] !== '' || game[1] !== '');
+    const hasAny = game[0] !== '' || game[1] !== '';
+    const t1Win = hasAny && n(game[0]) > n(game[1]);
+    const t2Win = hasAny && n(game[1]) > n(game[0]);
     return (
       <div style={S.scoreGameInputs}>
         {[
@@ -2689,7 +2690,7 @@ function ScoreEditor({ data, matchId, onClose, onSave, onForfeit }) {
 
   return (
     <div style={S.modalBackdrop} onClick={onClose}>
-      <div style={{ ...S.scoreModal, ...(isFinal ? { maxWidth: 500 } : {}) }} onClick={e => e.stopPropagation()}>
+      <div style={{ ...S.scoreModal, ...(isFinal ? { maxWidth: 480 } : {}) }} onClick={e => e.stopPropagation()}>
         {/* Header */}
         <div style={S.scoreHeader}>
           <div>
@@ -2701,76 +2702,84 @@ function ScoreEditor({ data, matchId, onClose, onSave, onForfeit }) {
 
         {isFinal ? (
           <>
-            {/* Series score banner */}
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 0, padding: '14px 20px 0', borderBottom: `1px solid ${T.rim}` }}>
-              {/* Team 1 */}
-              <div style={{ flex: 1, textAlign: 'right' }}>
-                <div style={{ fontFamily: "'Oswald', sans-serif", fontSize: 11, fontWeight: 700, letterSpacing: 1.5, color: t1Wins > t2Wins ? T.gold : T.ivoryDim, opacity: 0.9 }}>
-                  {team1.side}{team1.seed}
+            {/* Series banner — names + series score, compact single row */}
+            <div style={{ display: 'flex', alignItems: 'center', padding: '12px 20px', borderBottom: `1px solid ${T.rim}`, gap: 12 }}>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontFamily: "'Oswald', sans-serif", fontSize: 13, fontWeight: 700, color: t1Wins > t2Wins ? T.gold : T.ivory, letterSpacing: 0.5, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  {p1a?.name || team1.side + team1.seed}
                 </div>
-                <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 13, color: T.ivory, lineHeight: 1.2 }}>
-                  {p1a?.name || '—'}
-                </div>
-                <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 13, color: T.ivory, opacity: 0.6 }}>
+                <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 12, color: T.ivoryDim, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                   {p1b?.name || ''}
                 </div>
               </div>
-              {/* Series score */}
-              <div style={{ padding: '0 20px', textAlign: 'center' }}>
-                <div style={{ fontFamily: "'Oswald', sans-serif", fontSize: 40, fontWeight: 700, letterSpacing: 4, color: T.gold, lineHeight: 1 }}>
-                  {t1Wins} <span style={{ color: T.rim, fontSize: 28 }}>–</span> {t2Wins}
+              <div style={{ textAlign: 'center', flexShrink: 0 }}>
+                <div style={{ fontFamily: "'Oswald', sans-serif", fontSize: 32, fontWeight: 700, letterSpacing: 6, color: T.gold, lineHeight: 1 }}>
+                  {t1Wins}<span style={{ color: T.rim, fontSize: 22, margin: '0 2px' }}>–</span>{t2Wins}
                 </div>
-                <div style={{ fontFamily: "'Oswald', sans-serif", fontSize: 9, letterSpacing: 2, color: T.ivoryDim, marginTop: 2 }}>SERIES</div>
+                <div style={{ fontFamily: "'Oswald', sans-serif", fontSize: 8, letterSpacing: 2.5, color: T.ivoryDim }}>SERIES</div>
               </div>
-              {/* Team 2 */}
-              <div style={{ flex: 1, textAlign: 'left' }}>
-                <div style={{ fontFamily: "'Oswald', sans-serif", fontSize: 11, fontWeight: 700, letterSpacing: 1.5, color: t2Wins > t1Wins ? T.gold : T.ivoryDim, opacity: 0.9 }}>
-                  {team2.side}{team2.seed}
+              <div style={{ flex: 1, minWidth: 0, textAlign: 'right' }}>
+                <div style={{ fontFamily: "'Oswald', sans-serif", fontSize: 13, fontWeight: 700, color: t2Wins > t1Wins ? T.gold : T.ivory, letterSpacing: 0.5, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  {p2a?.name || team2.side + team2.seed}
                 </div>
-                <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 13, color: T.ivory, lineHeight: 1.2 }}>
-                  {p2a?.name || '—'}
-                </div>
-                <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 13, color: T.ivory, opacity: 0.6 }}>
+                <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 12, color: T.ivoryDim, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                   {p2b?.name || ''}
                 </div>
               </div>
             </div>
 
-            {/* Game tabs */}
-            <div style={{ display: 'flex', borderBottom: `1px solid ${T.rim}`, background: 'rgba(0,0,0,0.15)' }}>
+            {/* Game tabs — pill style, prominent */}
+            <div style={{ display: 'flex', gap: 8, padding: '14px 20px', background: 'rgba(0,0,0,0.2)', borderBottom: `1px solid ${T.rim}` }}>
               {games.map((game, i) => {
                 const hasScore = game[0] !== '' || game[1] !== '';
-                const gT1Win = n(game[0]) > n(game[1]) && hasScore;
-                const gT2Win = n(game[1]) > n(game[0]) && hasScore;
+                const gT1Win = hasScore && n(game[0]) > n(game[1]);
+                const gT2Win = hasScore && n(game[1]) > n(game[0]);
                 const isActive = activeGame === i;
                 return (
                   <button key={i} onClick={() => setActiveGame(i)} style={{
-                    flex: 1, padding: '10px 4px 9px',
-                    background: 'transparent', border: 'none', cursor: 'pointer',
-                    borderBottom: isActive ? `2px solid ${T.gold}` : '2px solid transparent',
-                    display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3,
-                    transition: 'border-color 0.15s',
+                    flex: 1,
+                    padding: '8px 4px',
+                    background: isActive ? T.gold : 'rgba(255,255,255,0.06)',
+                    border: isActive ? 'none' : `1px solid ${T.rim}`,
+                    borderRadius: 6,
+                    cursor: 'pointer',
+                    display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4,
+                    transition: 'background 0.15s, border 0.15s',
                   }}>
-                    <div style={{ fontFamily: "'Oswald', sans-serif", fontSize: 9, fontWeight: 700, letterSpacing: 2, color: isActive ? T.gold : T.ivoryDim }}>
+                    <div style={{ fontFamily: "'Oswald', sans-serif", fontSize: 10, fontWeight: 700, letterSpacing: 2, color: isActive ? T.bgDeep : T.ivoryDim }}>
                       GAME {i + 1}
                     </div>
                     {hasScore ? (
-                      <div style={{ fontFamily: "'Oswald', sans-serif", fontSize: 13, fontWeight: 700, color: isActive ? T.ivory : T.ivoryDim, letterSpacing: 1 }}>
-                        <span style={{ color: gT1Win ? T.gold : 'inherit' }}>{game[0]}</span>
-                        <span style={{ color: T.rim, margin: '0 3px' }}>–</span>
-                        <span style={{ color: gT2Win ? T.gold : 'inherit' }}>{game[1]}</span>
+                      <div style={{ fontFamily: "'Oswald', sans-serif", fontSize: 14, fontWeight: 700, letterSpacing: 1, color: isActive ? T.bgDeep : T.ivory }}>
+                        <span style={{ ...(!isActive && gT1Win ? { color: T.gold } : {}) }}>{game[0]}</span>
+                        <span style={{ opacity: 0.4, margin: '0 3px', fontSize: 11 }}>–</span>
+                        <span style={{ ...(!isActive && gT2Win ? { color: T.gold } : {}) }}>{game[1]}</span>
                       </div>
                     ) : (
-                      <div style={{ fontFamily: "'Oswald', sans-serif", fontSize: 11, color: T.rim }}>· · ·</div>
+                      <div style={{ fontFamily: "'Oswald', sans-serif", fontSize: 12, color: isActive ? T.bgDeep : T.rim, opacity: 0.7 }}>– –</div>
                     )}
                   </button>
                 );
               })}
             </div>
 
-            {/* Active game input */}
+            {/* Active game scores — no team names (already in banner) */}
             <div style={{ padding: '16px 20px' }}>
-              {renderGameSlots(activeGame)}
+              <div style={{ display: 'flex', gap: 12 }}>
+                {[
+                  { val: games[activeGame][0], idx: 0, isWin: games[activeGame][0] !== '' && n(games[activeGame][0]) > n(games[activeGame][1]) },
+                  { val: games[activeGame][1], idx: 1, isWin: games[activeGame][1] !== '' && n(games[activeGame][1]) > n(games[activeGame][0]) },
+                ].map(({ val, idx, isWin }) => (
+                  <div key={idx} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8 }}>
+                    <input type="text" inputMode="numeric" pattern="[0-9]*" value={val}
+                      placeholder="0"
+                      onChange={e => setScore(activeGame, idx, e.target.value.replace(/\D/g, ''))}
+                      onFocus={e => e.target.select()}
+                      style={{ ...S.scoreInput, fontSize: 48, padding: '18px 0', ...(isWin ? S.scoreInputWin : {}) }} />
+                    {isWin && <div style={S.scoreWinTag}>WIN</div>}
+                  </div>
+                ))}
+              </div>
             </div>
           </>
         ) : (
