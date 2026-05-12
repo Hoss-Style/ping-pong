@@ -807,9 +807,10 @@ export default function App() {
       m.scores = { team1: t1Scores, team2: t2Scores };
       const t1Wins = t1Scores.filter(s => s[0] > s[1]).length;
       const t2Wins = t2Scores.filter(s => s[0] < s[1]).length;
+      const winsNeeded = matchId === 'FINAL' ? 2 : 1;
       let winner = null;
-      if (t1Wins > t2Wins) winner = m.slots[0];
-      else if (t2Wins > t1Wins) winner = m.slots[1];
+      if (t1Wins >= winsNeeded) winner = m.slots[0];
+      else if (t2Wins >= winsNeeded) winner = m.slots[1];
       if (winner) {
         if (m.winner && m.winner !== winner) clearDownstream(next, matchId, m.winner);
         m.winner = winner; m.isForfeit = false;
