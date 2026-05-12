@@ -568,6 +568,7 @@ export default function App() {
   const [tableFilter, setTableFilter] = useState('all');
   const [urlView, setUrlView] = useState(() => new URLSearchParams(window.location.search).get('view') || '');
   const [printMode, setPrintMode] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
 
   const navigateView = (view) => {
     const url = view ? `?view=${view}` : window.location.pathname;
@@ -938,26 +939,70 @@ export default function App() {
               <div style={S.eventLabel}>INVITATIONAL · {EVENT_DATE}</div>
             </div>
           </div>
-          <div style={S.headerActions}>
-            <button style={S.iconBtn} onClick={() => navigateView('bracket')} title="Bracket TV">📺</button>
-            <button style={S.iconBtn} onClick={() => navigateView('schedule')} title="Schedule TV">📋</button>
-            {tab === 'schedule' && (
-              <button style={S.iconBtn} onClick={() => setPrintMode(true)} title="Print">🖨️</button>
-            )}
-            {isAdmin && (
+          <div style={{ position: 'relative' }}>
+            {/* Hamburger button */}
+            <button
+              style={S.hamburgerBtn}
+              onClick={() => setMenuOpen(o => !o)}
+              aria-label="Menu"
+            >
+              <span style={S.hamLine} />
+              <span style={S.hamLine} />
+              <span style={S.hamLine} />
+            </button>
+
+            {/* Dropdown menu */}
+            {menuOpen && (
               <>
-                <button
-                  style={data.locked ? S.lockBtnActive : S.iconBtn}
-                  onClick={toggleLock}
-                  title={data.locked ? 'Unlock rosters' : 'Lock rosters'}
-                >{data.locked ? '🔒' : '🔓'}</button>
-                <button style={S.iconBtn} onClick={() => setResetMenu(true)} title="Reset">↻</button>
+                {/* Backdrop to close */}
+                <div style={{ position: 'fixed', inset: 0, zIndex: 199 }} onClick={() => setMenuOpen(false)} />
+                <div style={S.dropMenu}>
+                  {/* TV views */}
+                  <div style={S.dropSection}>DISPLAY</div>
+                  <button style={S.dropItem} className="drop-item-hover" onClick={() => { navigateView('bracket'); setMenuOpen(false); }}>
+                    <span style={S.dropIcon}>📺</span> Bracket TV
+                  </button>
+                  <button style={S.dropItem} className="drop-item-hover" onClick={() => { navigateView('schedule'); setMenuOpen(false); }}>
+                    <span style={S.dropIcon}>🖥️</span> Schedule TV
+                  </button>
+
+                  {/* Print */}
+                  <div style={S.dropDivider} />
+                  <div style={S.dropSection}>PRINT</div>
+                  <button style={S.dropItem} className="drop-item-hover" onClick={() => { setPrintMode(true); setMenuOpen(false); }}>
+                    <span style={S.dropIcon}>🖨️</span> Print / Bracket
+                  </button>
+
+                  {/* Admin actions */}
+                  {isAdmin && (
+                    <>
+                      <div style={S.dropDivider} />
+                      <div style={S.dropSection}>ADMIN</div>
+                      <button style={S.dropItem} className="drop-item-hover" onClick={() => { toggleLock(); setMenuOpen(false); }}>
+                        <span style={S.dropIcon}>{data.locked ? '🔒' : '🔓'}</span>
+                        {data.locked ? 'Unlock Rosters' : 'Lock Rosters'}
+                      </button>
+                      <button style={S.dropItem} className="drop-item-hover" onClick={() => { setResetMenu(true); setMenuOpen(false); }}>
+                        <span style={S.dropIcon}>↻</span> Reset…
+                      </button>
+                      <div style={S.dropDivider} />
+                      <button style={{ ...S.dropItem, color: T.sage }} className="drop-item-hover" onClick={() => { handleLogout(); setMenuOpen(false); }}>
+                        <span style={S.dropIcon}>→</span> Log out
+                      </button>
+                    </>
+                  )}
+
+                  {/* Login */}
+                  {!isAdmin && (
+                    <>
+                      <div style={S.dropDivider} />
+                      <button style={S.dropItem} className="drop-item-hover" onClick={() => { setShowLogin(true); setMenuOpen(false); }}>
+                        <span style={S.dropIcon}>🔑</span> Admin login
+                      </button>
+                    </>
+                  )}
+                </div>
               </>
-            )}
-            {isAdmin ? (
-              <button style={S.adminBadgeBtn} onClick={handleLogout} title="Logout">ADMIN ✓</button>
-            ) : (
-              <button style={S.loginBtn} onClick={() => setShowLogin(true)} title="Admin login">ADMIN</button>
             )}
           </div>
         </header>
@@ -3665,6 +3710,40 @@ const S = {
     fontSize: 9, fontWeight: 600, letterSpacing: 1.6, marginTop: 5,
   },
   headerActions: { display: 'flex', gap: 6, alignItems: 'center' },
+
+  // Hamburger + dropdown
+  hamburgerBtn: {
+    background: 'rgba(212,165,75,0.06)', border: `1px solid ${T.rim}`,
+    borderRadius: 6, width: 40, height: 40, cursor: 'pointer',
+    display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 5,
+    padding: 0,
+  },
+  hamLine: {
+    display: 'block', width: 18, height: 2,
+    background: T.gold, borderRadius: 2, flexShrink: 0,
+  },
+  dropMenu: {
+    position: 'absolute', top: 'calc(100% + 8px)', right: 0,
+    background: T.bgCard, border: `1px solid ${T.rim}`,
+    borderRadius: 8, minWidth: 200, zIndex: 200,
+    boxShadow: '0 8px 32px rgba(0,0,0,0.5)',
+    overflow: 'hidden',
+    padding: '6px 0',
+  },
+  dropSection: {
+    fontFamily: "'Oswald', sans-serif", fontSize: 9, fontWeight: 700,
+    letterSpacing: 2, color: T.sage, padding: '8px 16px 4px',
+  },
+  dropItem: {
+    display: 'flex', alignItems: 'center', gap: 10,
+    width: '100%', background: 'none', border: 'none',
+    padding: '10px 16px', cursor: 'pointer',
+    fontFamily: "'Barlow Condensed', sans-serif", fontSize: 14, fontWeight: 600,
+    color: T.ivory, textAlign: 'left',
+    transition: 'background 0.12s',
+  },
+  dropIcon: { fontSize: 15, flexShrink: 0, width: 20, textAlign: 'center' },
+  dropDivider: { height: 1, background: T.rim, margin: '4px 0' },
   iconBtn: {
     background: 'rgba(212,165,75,0.06)',
     border: `1px solid ${T.rim}`, color: T.ivory,
@@ -4724,6 +4803,8 @@ input[type=number] { -moz-appearance: textfield; }
 
 button:active { transform: scale(0.98); transition: transform 80ms; }
 button:disabled { opacity: 0.5; cursor: not-allowed; }
+
+.drop-item-hover:hover { background: rgba(242,162,58,0.08) !important; }
 
 @media print {
   body * { visibility: hidden; }
