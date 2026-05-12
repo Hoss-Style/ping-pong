@@ -1462,7 +1462,7 @@ function PlayerSlot({ player, num, onTap, onRemove, editMode, isChamp, locked })
 // DESKTOP BRACKET — March Madness style for screens ≥ 960px
 // ═══════════════════════════════════════════════════════════════════════════
 function DesktopBracketView({ data, onTeamTap, onScoreEdit, onShareMatch, locked }) {
-  const MH = 120, MW = 210, HG = 20, VG = 18, PAD = 48;
+  const MH = 150, MW = 210, HG = 14, VG = 22, PAD = 40;
   const containerRef = useRef(null);
   const [scale, setScale] = useState(1);
   const UNIT = MH + VG;
@@ -1494,7 +1494,7 @@ function DesktopBracketView({ data, onTeamTap, onScoreEdit, onShareMatch, locked
   useEffect(() => {
     const compute = () => {
       if (!containerRef.current) return;
-      const available = containerRef.current.offsetWidth - 48;
+      const available = containerRef.current.offsetWidth - 24;
       setScale(available / totalW);
     };
     compute();
@@ -1597,8 +1597,8 @@ function DesktopBracketView({ data, onTeamTap, onScoreEdit, onShareMatch, locked
 // TV BRACKET VIEW — read-only, oversized championship card
 // ═══════════════════════════════════════════════════════════════════════════
 function TVBracketView({ data }) {
-  const MH = 130, MW = 220, HG = 22, VG = 18, PAD = 40;
-  const MH_F = 300, MW_F = 360; // final card: ~2.3× taller, 1.6× wider
+  const MH = 155, MW = 220, HG = 14, VG = 24, PAD = 40;
+  const MH_F = 340, MW_F = 360; // final card: ~2.3× taller, 1.6× wider
   const containerRef = useRef(null);
   const [scale, setScale] = useState(1);
   const UNIT = MH + VG;
@@ -1628,7 +1628,7 @@ function TVBracketView({ data }) {
   useEffect(() => {
     const compute = () => {
       if (!containerRef.current) return;
-      const available = containerRef.current.offsetWidth - 32;
+      const available = containerRef.current.offsetWidth - 24;
       setScale(available / totalW);
     };
     compute();
@@ -4741,7 +4741,7 @@ const S = {
   printFooter: { textAlign: 'center', paddingTop: 20, borderTop: '2px solid #000', fontSize: 13, fontWeight: 700 },
 
   // Desktop bracket
-  desktopWrap:    { overflow: 'hidden', flex: 1, padding: '20px 24px 32px', display: 'flex', flexDirection: 'column' },
+  desktopWrap:    { overflow: 'hidden', flex: 1, padding: '12px 12px 20px', display: 'flex', flexDirection: 'column' },
   dmcColLabel:    { position: 'absolute', textAlign: 'center', color: T.gold, fontSize: 13, fontFamily: 'Oswald, sans-serif', letterSpacing: 2, opacity: 0.85, pointerEvents: 'none' },
   dmc:            { background: T.bgCard, border: `1px solid ${T.rim}`, borderRadius: 7, overflow: 'hidden', display: 'flex', flexDirection: 'column' },
   dmcHeader:      { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '3px 6px', background: T.bgSoft, borderBottom: `1px solid ${T.rim}`, flexShrink: 0 },
