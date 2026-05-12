@@ -2624,22 +2624,23 @@ function ScoreEditor({ data, matchId, onClose, onSave, onForfeit }) {
   const numGames = isFinal ? 3 : 1;
   const formatLabel = isFinal ? 'BEST OF 3 TO 21' : '1 GAME TO 21';
 
-  // games[i] = [t1_score, t2_score]
+  // games[i] = [t1_score_str, t2_score_str] — strings so empty field shows blank, not "0"
   const [games, setGames] = useState(() => {
     if (match.scores.team1.length > 0) {
-      return match.scores.team1.map((g, i) => [g[0], match.scores.team2[i]?.[1] ?? g[1]]);
+      return match.scores.team1.map((g, i) => [String(g[0]), String(match.scores.team2[i]?.[1] ?? g[1])]);
     }
-    return Array.from({ length: numGames }, () => [0, 0]);
+    return Array.from({ length: numGames }, () => ['', '']);
   });
 
   const setScore = (gameIdx, teamIdx, val) => {
     setGames(prev => prev.map((g, i) =>
-      i !== gameIdx ? g : teamIdx === 0 ? [parseInt(val) || 0, g[1]] : [g[0], parseInt(val) || 0]
+      i !== gameIdx ? g : teamIdx === 0 ? [val, g[1]] : [g[0], val]
     ));
   };
 
-  const t1Wins = games.filter(g => g[0] > g[1]).length;
-  const t2Wins = games.filter(g => g[1] > g[0]).length;
+  const n = s => parseInt(s) || 0;
+  const t1Wins = games.filter(g => n(g[0]) > n(g[1])).length;
+  const t2Wins = games.filter(g => n(g[1]) > n(g[0])).length;
   const winner = t1Wins > t2Wins ? 1 : t2Wins > t1Wins ? 2 : null;
 
   if (!team1 || !team2) return null;
@@ -2650,9 +2651,8 @@ function ScoreEditor({ data, matchId, onClose, onSave, onForfeit }) {
   const p2b = team2.playerIds[1] ? data.players.find(p => p.id === team2.playerIds[1]) : null;
 
   const handleSave = () => {
-    // Convert back to the [t1_pts, t2_pts] per-team format saveScores expects
-    const t1Scores = games.map(g => [g[0], g[1]]);
-    const t2Scores = games.map(g => [g[0], g[1]]);
+    const t1Scores = games.map(g => [n(g[0]), n(g[1])]);
+    const t2Scores = games.map(g => [n(g[0]), n(g[1])]);
     onSave(matchId, t1Scores, t2Scores);
   };
 
@@ -2689,6 +2689,7 @@ function ScoreEditor({ data, matchId, onClose, onSave, onForfeit }) {
                         <div style={{ opacity: 0.7 }}>{pb?.name || '…'}</div>
                       </div>
                       <input type="text" inputMode="numeric" pattern="[0-9]*" value={val}
+                        placeholder="0"
                         onChange={e => setScore(i, idx, e.target.value.replace(/\D/g, ''))}
                         onFocus={e => e.target.select()}
                         style={{ ...S.scoreInput, ...(isWin ? S.scoreInputWin : {}) }} />
