@@ -755,11 +755,10 @@ export default function App() {
 
   // ─── Match advancement ──────────────────────────────────────────────────
   const advanceWinner = (matchId, teamId) => {
-    if (data.locked) { showToast('Bracket is locked — unlock to make changes'); return; }
     if (editTeamMode) return;
     const team = data.teams[teamId];
     if (!team) return;
-    if (team.playerIds.some(p => p === null)) {
+    if (!data.locked && team.playerIds.some(p => p === null)) {
       const emptyIdx = team.playerIds.findIndex(p => p === null);
       setPicker({ teamId, slotIndex: emptyIdx });
       return;
@@ -785,7 +784,6 @@ export default function App() {
   };
 
   const recordForfeit = (matchId, teamId) => {
-    if (data.locked) return;
     setData(prev => {
       const next = cloneData(prev);
       const m = next.matches[matchId];
@@ -802,7 +800,6 @@ export default function App() {
   };
 
   const saveScores = (matchId, t1Scores, t2Scores) => {
-    if (data.locked) return;
     setData(prev => {
       const next = cloneData(prev);
       const m = next.matches[matchId];
@@ -838,7 +835,7 @@ export default function App() {
   // ─── Lock / Unlock ──────────────────────────────────────────────────────
   const toggleLock = () => {
     setData(prev => ({ ...prev, locked: !prev.locked }));
-    showToast(data.locked ? 'Bracket unlocked' : 'Bracket locked 🔒');
+    showToast(data.locked ? 'Rosters unlocked' : 'Rosters locked 🔒');
   };
 
   // ─── Reset operations ───────────────────────────────────────────────────
@@ -952,7 +949,7 @@ export default function App() {
                 <button
                   style={data.locked ? S.lockBtnActive : S.iconBtn}
                   onClick={toggleLock}
-                  title={data.locked ? 'Unlock bracket' : 'Lock bracket'}
+                  title={data.locked ? 'Unlock rosters' : 'Lock rosters'}
                 >{data.locked ? '🔒' : '🔓'}</button>
                 <button style={S.iconBtn} onClick={() => setResetMenu(true)} title="Reset">↻</button>
               </>
@@ -993,7 +990,7 @@ export default function App() {
               onTeamTap={isAdmin ? advanceWinner : undefined}
               onScoreEdit={isAdmin ? setScoreEditor : undefined}
               onShareMatch={setShareCard}
-              locked={data.locked || !isAdmin}
+              locked={!isAdmin}
             />
           ) : (
             <BracketView
@@ -1001,14 +998,14 @@ export default function App() {
               activeRound={activeRound}
               setActiveRound={setActiveRound}
               onTeamTap={isAdmin ? advanceWinner : undefined}
-              onSlotTap={isAdmin ? (teamId, slotIndex) => setPicker({ teamId, slotIndex }) : undefined}
-              onRemovePlayer={isAdmin ? removePlayer : undefined}
+              onSlotTap={isAdmin && !data.locked ? (teamId, slotIndex) => setPicker({ teamId, slotIndex }) : undefined}
+              onRemovePlayer={isAdmin && !data.locked ? removePlayer : undefined}
               editTeamMode={editTeamMode}
-              setEditTeamMode={setEditTeamMode}
+              setEditTeamMode={isAdmin && !data.locked ? setEditTeamMode : () => {}}
               onScoreEdit={isAdmin ? setScoreEditor : undefined}
               onShareMatch={setShareCard}
-              onSeedEdit={isAdmin ? setSeedEditor : undefined}
-              locked={data.locked || !isAdmin}
+              onSeedEdit={isAdmin && !data.locked ? setSeedEditor : undefined}
+              locked={!isAdmin}
             />
           ))}
           {tab === 'schedule' && (
