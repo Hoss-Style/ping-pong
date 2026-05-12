@@ -1605,7 +1605,7 @@ function DesktopBracketView({ data, onTeamTap, onScoreEdit, onShareMatch, locked
       <DesktopMatchCard
         matchId={matchId} data={data}
         onTeamTap={onTeamTap} onScoreEdit={onScoreEdit} onShareMatch={onShareMatch}
-        locked={locked} width={MW} isFinalCard={isFinalCard}
+        locked={locked} width={MW} height={MH} isFinalCard={isFinalCard}
       />
     </div>
   );
@@ -1736,12 +1736,12 @@ function TVBracketView({ data }) {
 
   const mc  = (mid, x, top) => (
     <div key={mid} style={{ position: 'absolute', left: x, top: PAD + top }}>
-      <TVMatchCard matchId={mid} data={data} width={MW} />
+      <TVMatchCard matchId={mid} data={data} width={MW} height={MH} />
     </div>
   );
   const mcF = (mid, x, top) => (
     <div key={mid} style={{ position: 'absolute', left: x, top: PAD + top }}>
-      <TVMatchCard matchId={mid} data={data} width={MW_F} isFinal />
+      <TVMatchCard matchId={mid} data={data} width={MW_F} height={MH_F} isFinal />
     </div>
   );
 
@@ -1784,7 +1784,7 @@ function TVBracketView({ data }) {
   );
 }
 
-function TVMatchCard({ matchId, data, width, isFinal = false }) {
+function TVMatchCard({ matchId, data, width, height, isFinal = false }) {
   const match = data.matches[matchId];
   if (!match) return null;
 
@@ -1851,6 +1851,7 @@ function TVMatchCard({ matchId, data, width, isFinal = false }) {
   return (
     <div style={{
       ...S.dmc, width,
+      ...(height ? { height } : {}),
       ...(isFinal ? {
         border: `2px solid ${T.gold}`,
         boxShadow: `0 0 32px rgba(212,165,75,0.5), inset 0 0 24px rgba(212,165,75,0.07)`,
@@ -1864,7 +1865,7 @@ function TVMatchCard({ matchId, data, width, isFinal = false }) {
   );
 }
 
-function DesktopMatchCard({ matchId, data, onTeamTap, onScoreEdit, onShareMatch, locked, width, isFinalCard }) {
+function DesktopMatchCard({ matchId, data, onTeamTap, onScoreEdit, onShareMatch, locked, width, height, isFinalCard }) {
   const match = data.matches[matchId];
   if (!match) return null;
   const isFinal = matchId === 'FINAL';
@@ -1949,7 +1950,7 @@ function DesktopMatchCard({ matchId, data, onTeamTap, onScoreEdit, onShareMatch,
   })();
 
   return (
-    <div style={{ ...S.dmc, width, ...finalCardStyle }}>
+    <div style={{ ...S.dmc, width, ...(height ? { height } : {}), ...finalCardStyle }}>
       {renderSlot(0)}
       <div style={S.dmcDivider}>
         {dividerScore && <span style={S.dmcScore}>{dividerScore}</span>}
