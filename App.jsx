@@ -159,16 +159,26 @@ const SCHEDULE_SLOTS = [
 // ═══ HELPERS ═══════════════════════════════════════════════════════════════
 const cloneData = (d) => JSON.parse(JSON.stringify(d));
 
-// Migrate saved data to fix any schema changes
+const SCHEMA_VERSION = 2;
+
+// Migrate saved data to fix any schema changes — runs once per version bump
 function migrateData(d) {
   const next = cloneData(d);
+  const v = next.schemaVersion || 0;
+
   // v1: PI seeds were 8/9, now should be 9/10
-  Object.values(next.teams).forEach(team => {
-    if (team.pi && team.seed === 8) team.seed = 9;
-    else if (team.pi && team.seed === 9) team.seed = 10;
-  });
+  if (v < 1) {
+    Object.values(next.teams).forEach(team => {
+      if (team.pi && team.seed === 8) team.seed = 9;
+      else if (team.pi && team.seed === 9) team.seed = 10;
+    });
+  }
   // v2: awards field added
-  if (!next.awards) next.awards = { bestFit: '', bestServe: '', mostExtreme: '' };
+  if (v < 2) {
+    if (!next.awards) next.awards = { bestFit: '', bestServe: '', mostExtreme: '' };
+  }
+
+  next.schemaVersion = SCHEMA_VERSION;
   return next;
 }
 
@@ -1800,19 +1810,20 @@ function TVBracketView({ data }) {
 function TVMatchCard({ matchId, data, width, height, isFinal = false }) {
   const match = data.matches[matchId];
   if (!match) return null;
+  const isPIWinnerSlot = (slotIdx) => (matchId === 'L_R1_1' || matchId === 'R_R1_1') && slotIdx === 1;
 
   const renderSlot = (slotIdx) => {
     const teamId = match.slots[slotIdx];
     const isWinner = match.winner === teamId && !!teamId;
     const isLoser  = !!match.winner && match.winner !== teamId && !!teamId;
     const champWin = isFinal && isWinner;
+    const piWinner = isPIWinnerSlot(slotIdx);
 
     if (!teamId) {
-      const isPI = (matchId === 'L_R1_1' || matchId === 'R_R1_1') && slotIdx === 1;
       return (
         <div style={{ ...S.tvmcSlot, opacity: 0.3 }}>
-          <span style={S.tvmcSeed}>–</span>
-          <span style={{ ...S.tvmcName, ...(isFinal ? S.tvmcNameFinal : {}) }}>{isPI ? 'PI WINNER' : 'TBD'}</span>
+          <span style={S.tvmcSeed}>{piWinner ? '8' : '–'}</span>
+          <span style={{ ...S.tvmcName, ...(isFinal ? S.tvmcNameFinal : {}) }}>{piWinner ? 'PI WINNER' : 'TBD'}</span>
         </div>
       );
     }
@@ -1822,6 +1833,7 @@ function TVMatchCard({ matchId, data, width, height, isFinal = false }) {
     const p2 = team.playerIds[1] ? data.players.find(p => p.id === team.playerIds[1]) : null;
     const displayName = getTeamDisplayName(team, data);
     const hasTeamName = !!team.name;
+    const displaySeed = piWinner ? 8 : team.seed;
 
     return (
       <div style={{
@@ -1832,7 +1844,7 @@ function TVMatchCard({ matchId, data, width, height, isFinal = false }) {
         ...(isFinal ? S.tvmcSlotFinalPad : {}),
       }}>
         <span style={{ ...S.tvmcSeed, ...(isFinal ? S.tvmcSeedFinal : {}), ...(champWin ? { color: T.bgDeep } : {}) }}>
-          {team.seed}
+          {displaySeed}
         </span>
         <div style={S.tvmcNames}>
           <div style={{ ...S.tvmcName, ...(isFinal ? S.tvmcNameFinal : {}), ...(champWin ? { color: T.bgDeep } : {}) }}>
@@ -1883,17 +1895,18 @@ function DesktopMatchCard({ matchId, data, onTeamTap, onScoreEdit, onShareMatch,
   if (!match) return null;
   const isFinal = matchId === 'FINAL';
 
+  const isPIWinnerSlot = (matchId === 'L_R1_1' || matchId === 'R_R1_1') && slotIdx === 1;
+
   const renderSlot = (slotIdx) => {
     const teamId = match.slots[slotIdx];
     const isWinner = match.winner === teamId && !!teamId;
     const isLoser  = !!match.winner && match.winner !== teamId && !!teamId;
 
     if (!teamId) {
-      const isPI = (matchId === 'L_R1_1' || matchId === 'R_R1_1') && slotIdx === 1;
       return (
         <div style={S.dmcSlotEmpty}>
-          <span style={S.dmcSeedEmpty}>–</span>
-          <span style={S.dmcNameTbd}>{isPI ? 'PI WINNER' : 'TBD'}</span>
+          <span style={S.dmcSeedEmpty}>{isPIWinnerSlot ? '8' : '–'}</span>
+          <span style={S.dmcNameTbd}>{isPIWinnerSlot ? 'PI WINNER' : 'TBD'}</span>
         </div>
       );
     }
@@ -1903,6 +1916,7 @@ function DesktopMatchCard({ matchId, data, onTeamTap, onScoreEdit, onShareMatch,
     const p2 = team.playerIds[1] ? data.players.find(p => p.id === team.playerIds[1]) : null;
     const champWin = isFinal && isWinner;
     const hasTeamName = !!team.name;
+    const displaySeed = isPIWinnerSlot ? 8 : team.seed;
 
     return (
       <div
@@ -1915,7 +1929,7 @@ function DesktopMatchCard({ matchId, data, onTeamTap, onScoreEdit, onShareMatch,
         onClick={() => !locked && onTeamTap && onTeamTap(matchId, teamId)}
       >
         <span style={{ ...S.dmcSeed, ...(champWin ? { color: T.bgDeep } : {}) }}>
-          {team.seed}
+          {displaySeed}
         </span>
         <div style={S.dmcPlayerNames}>
           {hasTeamName && (
