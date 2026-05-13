@@ -3160,13 +3160,6 @@ function AwardsSection({ awards, isAdmin, onSave }) {
 function StatsView({ data, isAdmin, onSaveAwards }) {
   const stats = useMemo(() => computeStats(data), [data]);
 
-  const playerLB = useMemo(() => {
-    return Object.values(stats.playerStats)
-      .filter(p => p.wins + p.losses > 0)
-      .sort((a, b) => b.wins - a.wins || a.losses - b.losses)
-      .slice(0, 10);
-  }, [stats]);
-
   const teamLB = useMemo(() => {
     return Object.entries(stats.teamStats)
       .map(([id, s]) => ({ ...s, id, team: data.teams[id] }))
@@ -3258,22 +3251,9 @@ function StatsView({ data, isAdmin, onSaveAwards }) {
       </div>
 
       {/* Leaderboards */}
-      {playerLB.length > 0 && (
-        <div style={S.statsSection}>
-          <div style={S.statsSectionTitle}>🏆 TOP PLAYERS</div>
-          {playerLB.map((p, i) => (
-            <div key={i} style={S.lbRow}>
-              <div style={S.lbRank}>{i + 1}</div>
-              <div style={S.lbName}>{p.name}</div>
-              <div style={S.lbRecord}>{p.wins}W · {p.losses}L</div>
-            </div>
-          ))}
-        </div>
-      )}
-
       {teamLB.length > 0 && (
         <div style={S.statsSection}>
-          <div style={S.statsSectionTitle}>🥇 TEAM STANDINGS</div>
+          <div style={S.statsSectionTitle}>🥇 STANDINGS</div>
           {teamLB.map((t, i) => {
             const p1 = data.players.find(p => p.id === t.team.playerIds[0]);
             const p2 = data.players.find(p => p.id === t.team.playerIds[1]);
@@ -3283,7 +3263,10 @@ function StatsView({ data, isAdmin, onSaveAwards }) {
                 <div style={S.lbRank}>{i + 1}</div>
                 <div style={S.lbTeam}>
                   <div style={S.lbTeamSeed}>{t.team.side}{t.team.seed}</div>
-                  <div style={S.lbTeamNames}>{p1?.name} / {p2?.name}</div>
+                  <div style={{ ...S.lbTeamNames, display: 'flex', flexDirection: 'column', gap: 1 }}>
+                    <span>{p1?.name || '—'}</span>
+                    <span style={{ opacity: 0.65 }}>{p2?.name || '—'}</span>
+                  </div>
                 </div>
                 <div style={S.lbRecord}>
                   {t.wins}W · {t.losses}L
