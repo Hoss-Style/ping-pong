@@ -3688,27 +3688,32 @@ function PrintBracket({ data }) {
     const m = data.matches[matchId];
     if (!m?.slots[pos]) return null;
     const team = data.teams[m.slots[pos]];
-    return team ? { name: getTeamDisplayName(team, data), seed: team.seed } : null;
+    if (!team) return null;
+    const p1 = team.playerIds[0] ? data.players.find(p => p.id === team.playerIds[0]) : null;
+    const p2 = team.playerIds[1] ? data.players.find(p => p.id === team.playerIds[1]) : null;
+    if (team.name) return { seed: team.seed, p1: team.name, p2: '' };
+    return { seed: team.seed, p1: p1?.name || '—', p2: p2?.name || '' };
   };
 
   // ── Layout ──────────────────────────────────────────────────────────────
-  // Each match = two rows of height SH with no gap between them.
-  // Connector exits at the midpoint between row 1 and row 2 = top + SH.
-  const SH   = 26;           // row height (px)
-  const MH   = SH * 2;      // match height = 52
-  const BG   = 30;           // gap between sibling matches
-  const STEP = MH + BG;     // = 82
-  const H    = 4*STEP - BG; // = 298  (total bracket height)
+  // Each team slot = two sub-rows (one per player). Connector exits at
+  // the boundary between the two team slots = top + SSH.
+  const SH   = 19;           // sub-row height per player (px)
+  const SSH  = SH * 2;       // team slot height = 38 (two players)
+  const MH   = SSH * 2;      // match height = 76 (two teams)
+  const BG   = 20;           // gap between sibling matches
+  const STEP = MH + BG;      // = 96
+  const H    = 4*STEP - BG;  // = 364 (total bracket height)
 
   // mc = the y-coordinate of the connector exit for a match at `top`
-  const mc = top => top + SH;
+  const mc = top => top + SSH;
 
   const r16T = [0, STEP, 2*STEP, 3*STEP];
-  const r16C = r16T.map(mc);                              // [26,108,190,272]
-  const qfC  = [(r16C[0]+r16C[1])/2, (r16C[2]+r16C[3])/2]; // [67, 231]
-  const qfT  = qfC.map(c => c - SH);                     // [41, 205]
-  const sfC  = (qfC[0]+qfC[1])/2;                        // 149
-  const sfT  = sfC - SH;                                 // 123
+  const r16C = r16T.map(mc);
+  const qfC  = [(r16C[0]+r16C[1])/2, (r16C[2]+r16C[3])/2];
+  const qfT  = qfC.map(c => c - SSH);
+  const sfC  = (qfC[0]+qfC[1])/2;
+  const sfT  = sfC - SSH;
 
   // ── Column x-positions ──────────────────────────────────────────────────
   // Naming: lR16 = left R16 column left edge, lR16R = its right edge, etc.
@@ -3772,29 +3777,35 @@ function PrintBracket({ data }) {
   // ── Components ──────────────────────────────────────────────────────────
   const font = "'Barlow Condensed','Oswald',Arial,sans-serif";
 
-  // One team row — underline style
-  const Row = ({ team, show, isLast }) => (
+  // One team slot — two sub-rows (player 1 on top, player 2 below)
+  const TeamSlot = ({ team, show, isTop }) => (
     <div style={{
-      height: SH,
-      borderBottom: isLast ? 'none' : `1.5px solid ${show && team ? '#222' : '#bbb'}`,
-      display: 'flex', alignItems: 'center',
-      padding: '0 5px', gap: 5, boxSizing: 'border-box',
-      // Bottom row has no border so the underline IS the connector exit line
+      height: SSH, boxSizing: 'border-box',
+      borderBottom: isTop ? `1.5px solid ${show && team ? '#333' : '#bbb'}` : 'none',
     }}>
-      {show && team ? (
-        <>
-          <span style={{ fontSize: 10, fontWeight: 800, color: '#B5761E', minWidth: 16, textAlign: 'right', flexShrink: 0, fontFamily: font }}>{team.seed}</span>
-          <span style={{ fontSize: 11, fontWeight: 600, color: '#111', fontFamily: font, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{team.name}</span>
-        </>
-      ) : null}
+      {/* Player 1 row — carries the seed number */}
+      <div style={{ height: SH, display: 'flex', alignItems: 'center', padding: '0 5px', gap: 4 }}>
+        {show && team && (
+          <>
+            <span style={{ fontSize: 9, fontWeight: 800, color: '#B5761E', minWidth: 14, textAlign: 'right', flexShrink: 0, fontFamily: font }}>{team.seed}</span>
+            <span style={{ fontSize: 10, fontWeight: 700, color: '#111', fontFamily: font, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{team.p1}</span>
+          </>
+        )}
+      </div>
+      {/* Player 2 row — indented to align with name above */}
+      <div style={{ height: SH, display: 'flex', alignItems: 'center', padding: '0 5px 0 23px' }}>
+        {show && team && team.p2 && (
+          <span style={{ fontSize: 10, fontWeight: 600, color: '#444', fontFamily: font, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{team.p2}</span>
+        )}
+      </div>
     </div>
   );
 
-  // Two-row match block — top row has underline divider, bottom row IS the exit line
+  // Match block — top slot divides teams, bottom slot sits on exit line
   const Match = ({ t0, t1, w, show }) => (
     <div style={{ width: w, borderBottom: '1.5px solid #bbb' }}>
-      <Row team={t0} show={show} isLast={false} />
-      <Row team={t1} show={show} isLast={true} />
+      <TeamSlot team={t0} show={show} isTop={true} />
+      <TeamSlot team={t1} show={show} isTop={false} />
     </div>
   );
 
@@ -3866,11 +3877,11 @@ function PrintBracket({ data }) {
             ))
           )}
 
-          {/* CHAMPION box — gold bordered, two rows */}
+          {/* CHAMPION box — gold bordered, two slots */}
           <div style={{ position: 'absolute', top: sfT, left: finL, width: FINW }}>
             <div style={{ border: '2px solid #D4A54B', borderRadius: 3, overflow: 'hidden', background: 'rgba(212,165,75,0.04)' }}>
-              <div style={{ height: SH, borderBottom: '1.5px solid #D4A54B' }} />
-              <div style={{ height: SH }} />
+              <div style={{ height: SSH, borderBottom: '1.5px solid #D4A54B' }} />
+              <div style={{ height: SSH }} />
             </div>
           </div>
         </div>
