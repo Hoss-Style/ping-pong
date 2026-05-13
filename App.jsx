@@ -159,14 +159,14 @@ const SCHEDULE_SLOTS = [
 // ═══ HELPERS ═══════════════════════════════════════════════════════════════
 const cloneData = (d) => JSON.parse(JSON.stringify(d));
 
-const SCHEMA_VERSION = 2;
+const SCHEMA_VERSION = 3;
 
 // Migrate saved data to fix any schema changes — runs once per version bump
 function migrateData(d) {
   const next = cloneData(d);
   const v = next.schemaVersion || 0;
 
-  // v1: PI seeds were 8/9, now should be 9/10
+  // v1: PI seeds were 8/9, now should be 9/10 (seed-based, may double-bump if re-run)
   if (v < 1) {
     Object.values(next.teams).forEach(team => {
       if (team.pi && team.seed === 8) team.seed = 9;
@@ -176,6 +176,13 @@ function migrateData(d) {
   // v2: awards field added
   if (v < 2) {
     if (!next.awards) next.awards = { bestFit: '', bestServe: '', mostExtreme: '' };
+  }
+  // v3: fix PI seeds by team ID — corrects any double-bump from v1 running twice
+  if (v < 3) {
+    const piSeeds = { LP1: 9, LP2: 10, RP1: 9, RP2: 10 };
+    Object.entries(piSeeds).forEach(([id, seed]) => {
+      if (next.teams[id]) { next.teams[id].seed = seed; next.teams[id].pi = true; }
+    });
   }
 
   next.schemaVersion = SCHEMA_VERSION;
