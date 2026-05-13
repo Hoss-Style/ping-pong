@@ -3331,7 +3331,7 @@ function ResetMenu({ onClose, onResetBracket, onClearRosters, onResetAll }) {
 function TVDisplay({ data, onExit }) {
   const [now, setNow] = useState(new Date());
   useEffect(() => {
-    const id = setInterval(() => setNow(new Date()), 1000);
+    const id = setInterval(() => setNow(new Date()), 15000);
     return () => clearInterval(id);
   }, []);
 
@@ -3377,9 +3377,6 @@ function TVDisplay({ data, onExit }) {
             <span style={S.tvTopCountdownText}>{countdown}</span>
           </div>
         )}
-        <div style={S.tvClock}>
-          {now.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', hour12: true })}
-        </div>
         <button style={S.tvExitBtn} onClick={onExit}>✕ EXIT</button>
       </div>
 
@@ -3508,11 +3505,7 @@ function TVTicker({ stats, data }) {
 // TV SCHEDULE DISPLAY
 // ═══════════════════════════════════════════════════════════════════════════
 function TVScheduleDisplay({ data, onExit }) {
-  const [now, setNow] = useState(new Date());
-  useEffect(() => {
-    const id = setInterval(() => setNow(new Date()), 1000);
-    return () => clearInterval(id);
-  }, []);
+  const [now] = useState(new Date());
 
   const rawLive = getLiveSlotInfo(SCHEDULE_SLOTS);
   const isEventDay = rawLive.status === 'live' || (rawLive.status === 'upcoming' && rawLive.daysUntil == null);
@@ -3532,9 +3525,6 @@ function TVScheduleDisplay({ data, onExit }) {
             <div style={S.tvBrandTitle}>ATLAS <span style={{ color: T.gold }}>SUPREME</span></div>
             <div style={S.tvBrandSub}>SCHEDULE · {EVENT_DATE}</div>
           </div>
-        </div>
-        <div style={S.tvClock}>
-          {now.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', hour12: true })}
         </div>
         <button style={S.tvExitBtn} onClick={onExit}>✕ EXIT</button>
       </div>
