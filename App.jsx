@@ -159,6 +159,17 @@ const SCHEDULE_SLOTS = [
 // ═══ HELPERS ═══════════════════════════════════════════════════════════════
 const cloneData = (d) => JSON.parse(JSON.stringify(d));
 
+// Migrate saved data to fix any schema changes
+function migrateData(d) {
+  const next = cloneData(d);
+  // v1: PI seeds were 8/9, now should be 9/10
+  Object.values(next.teams).forEach(team => {
+    if (team.pi && team.seed === 8) team.seed = 9;
+    else if (team.pi && team.seed === 9) team.seed = 10;
+  });
+  return next;
+}
+
 function makeDefaultData() {
   const players = PLAYER_NAMES_DEFAULT.map((name, i) => ({
     id: `p${i + 1}`,
@@ -638,7 +649,7 @@ export default function App() {
       .single()
       .then(({ data: row, error }) => {
         if (error) console.error('[load]', error);
-        if (row?.data) setData(row.data);
+        if (row?.data) setData(migrateData(row.data));
         setLoaded(true);
       });
 
