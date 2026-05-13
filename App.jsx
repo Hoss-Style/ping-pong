@@ -1895,9 +1895,10 @@ function DesktopMatchCard({ matchId, data, onTeamTap, onScoreEdit, onShareMatch,
   if (!match) return null;
   const isFinal = matchId === 'FINAL';
 
-  const isPIWinnerSlot = (matchId === 'L_R1_1' || matchId === 'R_R1_1') && slotIdx === 1;
+  const isMatchPIWinner = matchId === 'L_R1_1' || matchId === 'R_R1_1';
 
   const renderSlot = (slotIdx) => {
+    const piWinner = isMatchPIWinner && slotIdx === 1;
     const teamId = match.slots[slotIdx];
     const isWinner = match.winner === teamId && !!teamId;
     const isLoser  = !!match.winner && match.winner !== teamId && !!teamId;
@@ -1905,8 +1906,8 @@ function DesktopMatchCard({ matchId, data, onTeamTap, onScoreEdit, onShareMatch,
     if (!teamId) {
       return (
         <div style={S.dmcSlotEmpty}>
-          <span style={S.dmcSeedEmpty}>{isPIWinnerSlot ? '8' : '–'}</span>
-          <span style={S.dmcNameTbd}>{isPIWinnerSlot ? 'PI WINNER' : 'TBD'}</span>
+          <span style={S.dmcSeedEmpty}>{piWinner ? '8' : '–'}</span>
+          <span style={S.dmcNameTbd}>{piWinner ? 'PI WINNER' : 'TBD'}</span>
         </div>
       );
     }
@@ -1916,7 +1917,7 @@ function DesktopMatchCard({ matchId, data, onTeamTap, onScoreEdit, onShareMatch,
     const p2 = team.playerIds[1] ? data.players.find(p => p.id === team.playerIds[1]) : null;
     const champWin = isFinal && isWinner;
     const hasTeamName = !!team.name;
-    const displaySeed = isPIWinnerSlot ? 8 : team.seed;
+    const displaySeed = piWinner ? 8 : team.seed;
 
     return (
       <div
