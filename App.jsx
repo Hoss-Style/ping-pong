@@ -3794,7 +3794,7 @@ function PrintBracket({ data }) {
 
   // ── Column x-positions ──────────────────────────────────────────────────
   // Naming: lR16 = left R16 column left edge, lR16R = its right edge, etc.
-  const PAD=8, R16W=150, CONN=22, QFW=120, SFW=112, FINW=118;
+  const PAD=6, R16W=128, CONN=16, QFW=106, SFW=96, FINW=104;
 
   const lR16   = PAD;
   const lR16R  = lR16  + R16W;   // 158
@@ -5182,8 +5182,10 @@ button:disabled { opacity: 0.5; cursor: not-allowed; }
 .drop-item-hover:hover { background: rgba(242,162,58,0.08) !important; }
 
 @media print {
+  @page { size: landscape; margin: 0.4in; }
   body * { visibility: hidden; }
   [data-print-area], [data-print-area] * { visibility: visible; }
+  [data-print-area] { position: fixed; top: 0; left: 0; width: 100%; }
   .no-print { display: none !important; }
 }
 `;
