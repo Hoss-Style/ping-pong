@@ -167,6 +167,8 @@ function migrateData(d) {
     if (team.pi && team.seed === 8) team.seed = 9;
     else if (team.pi && team.seed === 9) team.seed = 10;
   });
+  // v2: awards field added
+  if (!next.awards) next.awards = { bestFit: '', bestServe: '', mostExtreme: '' };
   return next;
 }
 
@@ -201,7 +203,7 @@ function makeDefaultData() {
     if (!matches[m]) matches[m] = makeMatch();
   });
 
-  return { players, teams, matches, locked: false, scheduleTimes: Array(SCHEDULE_SLOTS.length).fill(null) };
+  return { players, teams, matches, locked: false, scheduleTimes: Array(SCHEDULE_SLOTS.length).fill(null), awards: { bestFit: '', bestServe: '', mostExtreme: '' } };
 }
 
 function makeMatch() {
@@ -1197,7 +1199,7 @@ export default function App() {
               } : undefined}
             />
           )}
-          {tab === 'stats' && <StatsView data={data} />}
+          {tab === 'stats' && <StatsView data={data} isAdmin={isAdmin} onSaveAwards={awards => setData(prev => ({ ...prev, awards }))} />}
         </main>
 
         {/* CHAMPION BADGE */}
@@ -3084,7 +3086,78 @@ function PlayerScheduleSheet({ data, playerId, onClose }) {
 // ═══════════════════════════════════════════════════════════════════════════
 // STATS VIEW
 // ═══════════════════════════════════════════════════════════════════════════
-function StatsView({ data }) {
+// ═══════════════════════════════════════════════════════════════════════════
+// AWARDS SECTION
+// ═══════════════════════════════════════════════════════════════════════════
+const AWARD_DEFS = [
+  { key: 'bestFit',      emoji: '👔', label: 'BEST FIT',      desc: 'Best dressed on the court' },
+  { key: 'bestServe',    emoji: '🏓', label: 'BEST SERVE',    desc: 'Deadliest serve of the day' },
+  { key: 'mostExtreme',  emoji: '🤯', label: 'MOST EXTREME',  desc: 'Wildest moment or player' },
+];
+
+function AwardsSection({ awards, isAdmin, onSave }) {
+  const [editing, setEditing] = useState(null); // key being edited
+  const [draft, setDraft] = useState('');
+
+  const startEdit = (key) => { setEditing(key); setDraft(awards[key] || ''); };
+  const commitEdit = () => {
+    if (editing) { onSave({ ...awards, [editing]: draft.trim() }); }
+    setEditing(null);
+  };
+
+  const hasAny = AWARD_DEFS.some(a => awards[a.key]);
+  if (!hasAny && !isAdmin) return null;
+
+  return (
+    <div style={S.statsSection}>
+      <div style={S.statsSectionTitle}>🎖️ AWARDS</div>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+        {AWARD_DEFS.map(({ key, emoji, label, desc }) => {
+          const value = awards[key] || '';
+          const isEditingThis = editing === key;
+          if (!value && !isAdmin) return null;
+          return (
+            <div key={key} style={{
+              background: 'rgba(255,255,255,0.04)', border: `1px solid ${value ? T.gold + '55' : T.rim}`,
+              borderRadius: 10, padding: '12px 14px', display: 'flex', alignItems: 'center', gap: 12,
+            }}>
+              <div style={{ fontSize: 26, flexShrink: 0, lineHeight: 1 }}>{emoji}</div>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontFamily: "'Oswald',sans-serif", fontSize: 11, fontWeight: 700, letterSpacing: 1.5, color: T.gold, marginBottom: 2 }}>{label}</div>
+                {isEditingThis ? (
+                  <input
+                    autoFocus
+                    value={draft}
+                    onChange={e => setDraft(e.target.value)}
+                    onKeyDown={e => { if (e.key === 'Enter') commitEdit(); if (e.key === 'Escape') setEditing(null); }}
+                    onBlur={commitEdit}
+                    placeholder={desc}
+                    style={{
+                      background: 'rgba(255,255,255,0.08)', border: `1px solid ${T.gold}`,
+                      borderRadius: 6, color: T.ivory, fontFamily: "'Barlow Condensed',sans-serif",
+                      fontSize: 15, fontWeight: 600, padding: '4px 8px', width: '100%', boxSizing: 'border-box', outline: 'none',
+                    }}
+                  />
+                ) : (
+                  <div style={{ fontFamily: "'Barlow Condensed',sans-serif", fontSize: 15, fontWeight: 600, color: value ? T.ivory : T.ivoryDim, letterSpacing: 0.3 }}>
+                    {value || (isAdmin ? <span style={{ fontStyle: 'italic', opacity: 0.4 }}>{desc}</span> : '—')}
+                  </div>
+                )}
+              </div>
+              {isAdmin && !isEditingThis && (
+                <button onClick={() => startEdit(key)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: T.ivoryDim, fontSize: 13, padding: 4, flexShrink: 0 }}>
+                  ✏️
+                </button>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function StatsView({ data, isAdmin, onSaveAwards }) {
   const stats = useMemo(() => computeStats(data), [data]);
 
   const playerLB = useMemo(() => {
@@ -3221,6 +3294,10 @@ function StatsView({ data }) {
           })}
         </div>
       )}
+
+      {/* Fun Awards */}
+      <AwardsSection awards={data.awards || {}} isAdmin={isAdmin} onSave={onSaveAwards} />
+
     </div>
   );
 }
