@@ -53,8 +53,8 @@ const PLAYER_NAMES_DEFAULT = [
   'MARTY MAIER', 'CARTER WILSON',          // L5
   'COOPER FRATT', 'JOSEPH ZAKHARY',        // L6 (paired solo)
   'HAYDEN THOMSON', 'DANNY SCHUSTER',      // L7 (paired solo)
-  'CHRIS CANTER', 'TJ CLAASSEN',           // L8 PI (paired solo)
-  'HAGEN HYATT', 'BEN SACKS',              // L9 PI (paired solo)
+  'CHRIS CANTER', 'TJ CLAASSEN',           // L9 PI (paired solo)
+  'HAGEN HYATT', 'BEN SACKS',              // L10 PI (paired solo)
   'MILO MORAN', 'CHRIS WALTON',            // R1
   'TIM WESTFALL', 'JACK MCANDREW',         // R2
   'ROMAN SHENKIRYK', 'BRETT BAKER',        // R3
@@ -62,8 +62,8 @@ const PLAYER_NAMES_DEFAULT = [
   'ADAM PINYARD', 'WARREN KELLY',          // R5
   'JAN DEJONG', 'ANTHONY ARVIDSON',        // R6
   'CHASE GABRIEL', 'STEIN KOSS',           // R7 (paired solo)
-  'CHRIS KREWSON', 'TOM LEWIS JR.',        // R8 PI (paired solo)
-  'ILENE SMITH', 'ASHLEY PETERS',          // R9 PI (paired solo)
+  'CHRIS KREWSON', 'TOM LEWIS JR.',        // R9 PI (paired solo)
+  'ILENE SMITH', 'ASHLEY PETERS',          // R10 PI (paired solo)
 ];
 
 // Bracket structure: 18 teams, 4 in play-in (2 PI matches), 14 byes to R16
@@ -85,8 +85,8 @@ const TEAM_SLOTS = [
   { id: 'L6', side: 'L', defaultSeed: 6, match: 'L_R1_3', position: 1 },
   { id: 'L2', side: 'L', defaultSeed: 2, match: 'L_R1_4', position: 0 },
   { id: 'L7', side: 'L', defaultSeed: 7, match: 'L_R1_4', position: 1 },
-  { id: 'LP1', side: 'L', defaultSeed: 8, match: 'L_PI', position: 0, pi: true },
-  { id: 'LP2', side: 'L', defaultSeed: 9, match: 'L_PI', position: 1, pi: true },
+  { id: 'LP1', side: 'L', defaultSeed: 9, match: 'L_PI', position: 0, pi: true },
+  { id: 'LP2', side: 'L', defaultSeed: 10, match: 'L_PI', position: 1, pi: true },
   // RIGHT SIDE
   { id: 'R1', side: 'R', defaultSeed: 1, match: 'R_R1_1', position: 0 },
   { id: 'R4', side: 'R', defaultSeed: 4, match: 'R_R1_2', position: 0 },
@@ -95,16 +95,16 @@ const TEAM_SLOTS = [
   { id: 'R6', side: 'R', defaultSeed: 6, match: 'R_R1_3', position: 1 },
   { id: 'R2', side: 'R', defaultSeed: 2, match: 'R_R1_4', position: 0 },
   { id: 'R7', side: 'R', defaultSeed: 7, match: 'R_R1_4', position: 1 },
-  { id: 'RP1', side: 'R', defaultSeed: 8, match: 'R_PI', position: 0, pi: true },
-  { id: 'RP2', side: 'R', defaultSeed: 9, match: 'R_PI', position: 1, pi: true },
+  { id: 'RP1', side: 'R', defaultSeed: 9, match: 'R_PI', position: 0, pi: true },
+  { id: 'RP2', side: 'R', defaultSeed: 10, match: 'R_PI', position: 1, pi: true },
 ];
 
 // Maps seed (1-9) per side to a TEAM_SLOT id.
 // When user reseeds, we keep the slot positions fixed but the TEAM associated
 // with each seed changes. The slot's defaultSeed is just the initial label.
 const SEED_TO_SLOT = {
-  L: { 1: 'L1', 2: 'L2', 3: 'L3', 4: 'L4', 5: 'L5', 6: 'L6', 7: 'L7', 8: 'LP1', 9: 'LP2' },
-  R: { 1: 'R1', 2: 'R2', 3: 'R3', 4: 'R4', 5: 'R5', 6: 'R6', 7: 'R7', 8: 'RP1', 9: 'RP2' },
+  L: { 1: 'L1', 2: 'L2', 3: 'L3', 4: 'L4', 5: 'L5', 6: 'L6', 7: 'L7', 9: 'LP1', 10: 'LP2' },
+  R: { 1: 'R1', 2: 'R2', 3: 'R3', 4: 'R4', 5: 'R5', 6: 'R6', 7: 'R7', 9: 'RP1', 10: 'RP2' },
 };
 
 // Match advancement flow
@@ -770,9 +770,9 @@ export default function App() {
       fromTeam.seed = toSeed;
       toTeam.seed = fromSeed;
 
-      // PI flag follows seeds 8/9
-      fromTeam.pi = (toSeed === 8 || toSeed === 9);
-      toTeam.pi = (fromSeed === 8 || fromSeed === 9);
+      // PI flag follows seeds 9/10
+      fromTeam.pi = (toSeed === 9 || toSeed === 10);
+      toTeam.pi = (fromSeed === 9 || fromSeed === 10);
 
       // Rebuild all match slot assignments based on new seeding
       rebuildMatchesFromSeeds(next);
@@ -1970,7 +1970,7 @@ function SeedEditor({ data, side, currentSeed, onClose, onReassign }) {
   const currentP2 = currentTeam ? data.players.find(p => p.id === currentTeam.playerIds[1]) : null;
 
   // All seeds on this side, sorted
-  const seedsOnSide = [1,2,3,4,5,6,7,8,9].map(seed => {
+  const seedsOnSide = [1,2,3,4,5,6,7,9,10].map(seed => {
     const team = Object.values(data.teams).find(t => t.side === side && t.seed === seed);
     return { seed, team };
   });
